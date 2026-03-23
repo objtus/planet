@@ -300,13 +300,20 @@ select {
 }
 
 /* 表示モードタブ */
-.view-tabs { display: flex; gap: 4px; }
+.view-tabs { display: flex; align-items: center; gap: 4px; }
 .view-tabs button { font-size: 12px; padding: 3px 10px; }
 .view-tabs button.active {
   background: var(--color-background-info);
   color: var(--color-text-info);
   border-color: var(--color-border-info);
 }
+.view-nav {
+  padding: 3px 7px !important;
+  font-size: 15px !important;
+  color: var(--color-text-secondary);
+  line-height: 1;
+}
+.view-nav:hover { color: var(--color-text-primary); }
 
 /* =========================================================
    STAT CARDS

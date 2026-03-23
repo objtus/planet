@@ -45,10 +45,12 @@
     <div class="detail-header">
       <span class="detail-title" id="detail-title"></span>
       <div class="view-tabs">
+        <button class="view-nav" id="tab-prev" onclick="shiftView(-1)" title="前へ">‹</button>
         <button id="tab-day"   class="active" onclick="setViewMode('day')">日</button>
         <button id="tab-week"  onclick="setViewMode('week')">週</button>
         <button id="tab-month" onclick="setViewMode('month')">月</button>
         <button id="tab-year"  onclick="setViewMode('year')">年</button>
+        <button class="view-nav" id="tab-next" onclick="shiftView(1)"  title="次へ">›</button>
       </div>
     </div>
 

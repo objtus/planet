@@ -303,6 +303,51 @@ function shiftMonth(n) {
 }
 function shiftYear(n) { cur.year += n; buildCal(); }
 
+/**
+ * view-tabs の ‹ / › ボタン。現在の viewMode に応じて前後の単位へ移動する。
+ * n = -1: 前へ  /  n = +1: 次へ
+ */
+function shiftView(n) {
+  if (cur.viewMode === 'day') {
+    // 前日 / 次の日
+    const d = new Date(cur.year, cur.month, (cur.selDay ?? 1) + n);
+    cur.year   = d.getFullYear();
+    cur.month  = d.getMonth();
+    cur.selDay = d.getDate();
+    cur.selWeek = null;
+    syncTabLabel();
+    buildCal();
+    loadDay();
+
+  } else if (cur.viewMode === 'week') {
+    // 前週 / 次週
+    if (!cur.selWeek) return;
+    const mon     = isoWeekFirstDay(cur.selWeek.year, cur.selWeek.week);
+    const nextMon = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + n * 7);
+    cur.selWeek  = isoWeek(nextMon);
+    cur.year     = nextMon.getFullYear();
+    cur.month    = nextMon.getMonth();
+    cur.selDay   = null;
+    syncTabLabel();
+    buildCal();
+    loadWeek(cur.selWeek.year, cur.selWeek.week);
+
+  } else if (cur.viewMode === 'month') {
+    // 先月 / 次の月
+    cur.month += n;
+    if (cur.month < 0)  { cur.month = 11; cur.year--; }
+    if (cur.month > 11) { cur.month = 0;  cur.year++; }
+    buildCal();
+    loadMonth();
+
+  } else if (cur.viewMode === 'year') {
+    // 前年 / 次の年
+    cur.year += n;
+    buildCal();
+    loadYear();
+  }
+}
+
 function goToday() {
   const t = new Date();
   cur = {

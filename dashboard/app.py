@@ -156,7 +156,7 @@ def create_app():
                 cur.execute(SELECT_COLS + """
                      WHERE l.is_deleted = FALSE
                        AND DATE(l.timestamp AT TIME ZONE 'Asia/Tokyo') = %s
-                     ORDER BY l.timestamp
+                     ORDER BY l.timestamp DESC
                 """, (date_arg,))
 
             elif period == "week":
@@ -165,7 +165,7 @@ def create_app():
                      WHERE l.is_deleted = FALSE
                        AND EXTRACT(isoyear FROM l.timestamp AT TIME ZONE 'Asia/Tokyo') = %s
                        AND EXTRACT(week    FROM l.timestamp AT TIME ZONE 'Asia/Tokyo') = %s
-                     ORDER BY l.timestamp
+                     ORDER BY l.timestamp DESC
                      LIMIT 1000
                 """, (int(year_part), int(week_part)))
 
@@ -173,7 +173,7 @@ def create_app():
                 cur.execute(SELECT_COLS + """
                      WHERE l.is_deleted = FALSE
                        AND TO_CHAR(l.timestamp AT TIME ZONE 'Asia/Tokyo', 'YYYY-MM') = %s
-                     ORDER BY l.timestamp
+                     ORDER BY l.timestamp DESC
                      LIMIT 2000
                 """, (date_arg,))
 
@@ -181,7 +181,7 @@ def create_app():
                 cur.execute(SELECT_COLS + """
                      WHERE l.is_deleted = FALSE
                        AND EXTRACT(year FROM l.timestamp AT TIME ZONE 'Asia/Tokyo') = %s
-                     ORDER BY l.timestamp
+                     ORDER BY l.timestamp DESC
                      LIMIT 5000
                 """, (int(date_arg),))
 
