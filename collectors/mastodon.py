@@ -85,10 +85,27 @@ class MastodonCollector(BaseCollector):
                 visibility = status.get("visibility", "public")
                 spoiler_text = status.get("spoiler_text") or None
 
+                # メディア添付を metadata に保存
+                media = [
+                    {
+                        "url":   a["url"],
+                        "type":  a.get("type", ""),
+                        "thumb": a.get("preview_url") or a["url"],
+                    }
+                    for a in status.get("media_attachments", [])
+                    if a.get("url")
+                ]
+
+                meta = {"type": "note", "visibility": visibility}
+                if spoiler_text:
+                    meta["cw"] = spoiler_text
+                if media:
+                    meta["media"] = media
+
                 log_id = self.insert_log(
                     source_id, status["id"], content, url,
                     status["created_at"],
-                    {"type": "note", "visibility": visibility}
+                    meta,
                 )
                 if log_id:
                     self.cur.execute(

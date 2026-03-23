@@ -91,12 +91,29 @@ class MisskeyCollector(BaseCollector):
                 url = f"{instance}/notes/{note['id']}"
                 visibility = note.get("visibility", "public")
                 cw = note.get("cw")
-                has_files = bool(note.get("files"))
+
+                # ファイル添付を metadata に保存（画像・動画 URL）
+                media = [
+                    {
+                        "url":   f["url"],
+                        "type":  f.get("type", ""),
+                        "thumb": f.get("thumbnailUrl") or f["url"],
+                    }
+                    for f in note.get("files", [])
+                    if f.get("url")
+                ]
+                has_files = bool(media)
+
+                meta = {"type": "note", "visibility": visibility}
+                if cw:
+                    meta["cw"] = cw
+                if media:
+                    meta["media"] = media
 
                 log_id = self.insert_log(
                     source_id, note["id"], text, url,
                     note["createdAt"],
-                    {"type": "note", "visibility": visibility}
+                    meta,
                 )
                 if log_id:
                     self.cur.execute(

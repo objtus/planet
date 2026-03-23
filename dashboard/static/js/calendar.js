@@ -7,29 +7,27 @@
 // 定数・状態
 // =========================================================
 
-const MONTHS   = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
-const DOW_HEADERS = ['月','火','水','木','金','土','日'];
+const MONTHS = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
 
-// SOURCES を id → オブジェクト の Map に変換
 const SOURCE_MAP = new Map(SOURCES.map(s => [s.id, s]));
 
-// 初期状態
 const todayDate = new Date(TODAY + 'T00:00:00');
 let cur = {
-  year:  todayDate.getFullYear(),
-  month: todayDate.getMonth(),       // 0-indexed
-  selDay: todayDate.getDate(),        // 選択中の日（1-indexed）
-  selWeek: null,                      // 選択中の週 {year, week}
-  viewMode: 'day',                    // 'day' | 'week' | 'month' | 'year'
+  year:     todayDate.getFullYear(),
+  month:    todayDate.getMonth(),   // 0-indexed
+  selDay:   todayDate.getDate(),    // 選択中の日（1-indexed）、日ビュー以外は null
+  selWeek:  null,                   // 選択中の週 {year, week}
+  viewMode: 'day',                  // 'day' | 'week' | 'month' | 'year'
 };
 
-// フィルター: アクティブな source_id の Set（初期値：全 ON）
-let activeIds = new Set(SOURCES.map(s => s.id));
+let activeIds     = new Set(SOURCES.map(s => s.id));
+let mediaFilter   = false;  // true = メディアあり投稿のみ表示
 
 // =========================================================
-// ISO 週番号
+// ISO 週番号ユーティリティ
 // =========================================================
 
+/** Date → {week, year} */
 function isoWeek(d) {
   const t  = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
   const dn = t.getUTCDay() || 7;
@@ -42,12 +40,21 @@ function isoWeek(d) {
   };
 }
 
+/** ISO年・週番号 → その週の月曜日の Date */
+function isoWeekFirstDay(isoYear, isoWeekNum) {
+  const jan4    = new Date(isoYear, 0, 4);
+  const jan4Dow = (jan4.getDay() + 6) % 7;       // Mon=0 … Sun=6
+  const week1Mon = new Date(isoYear, 0, 4 - jan4Dow);
+  return new Date(week1Mon.getFullYear(), week1Mon.getMonth(),
+                  week1Mon.getDate() + (isoWeekNum - 1) * 7);
+}
+
 function dateStr(y, m, d) {
   return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
 }
 
 function heatLevel(count) {
-  if (!count)   return 0;
+  if (!count)    return 0;
   if (count < 3)  return 1;
   if (count < 10) return 2;
   if (count < 25) return 3;
@@ -63,17 +70,17 @@ function buildCal() {
   // セレクト更新
   const selM = document.getElementById('sel-month');
   const selY = document.getElementById('sel-year');
-  selM.innerHTML = MONTHS.map((m,i) =>
-    `<option value="${i}"${i===cur.month?' selected':''}>${m}</option>`
+  selM.innerHTML = MONTHS.map((m, i) =>
+    `<option value="${i}"${i === cur.month ? ' selected' : ''}>${m}</option>`
   ).join('');
   const thisYear = new Date().getFullYear();
-  selY.innerHTML = Array.from({length: thisYear - 2016}, (_,i) => 2017 + i)
+  selY.innerHTML = Array.from({length: thisYear - 2016}, (_, i) => 2017 + i)
     .concat([thisYear + 1])
-    .map(y => `<option value="${y}"${y===cur.year?' selected':''}>${y}年</option>`)
+    .map(y => `<option value="${y}"${y === cur.year ? ' selected' : ''}>${y}年</option>`)
     .join('');
 
   // グリッド生成
-  const body  = document.getElementById('cal-body');
+  const body     = document.getElementById('cal-body');
   body.innerHTML = '';
 
   const first    = new Date(cur.year, cur.month, 1);
@@ -81,32 +88,32 @@ function buildCal() {
   const startDow = (first.getDay() + 6) % 7;  // 月曜=0
   const today    = new Date();
 
-  // セル配列（null = 空）
   const cells = [];
   for (let i = 0; i < startDow; i++) cells.push(null);
   for (let d = 1; d <= last.getDate(); d++) cells.push(d);
   while (cells.length % 7) cells.push(null);
 
   for (let r = 0; r < cells.length / 7; r++) {
-    const tr   = document.createElement('tr');
+    const tr = document.createElement('tr');
 
-    // 週番号セル（最左列）
-    const refDay = cells[r*7] ?? (cells.find((c,i) => i >= r*7 && c !== null));
+    // 週番号セル
+    const refDay = cells.slice(r * 7, r * 7 + 7).find(c => c !== null);
     const { week: wn, year: wy } = isoWeek(new Date(cur.year, cur.month, refDay));
     const isSelWeek = cur.selWeek && cur.selWeek.week === wn && cur.selWeek.year === wy;
-    const tdW = document.createElement('td');
+
+    const tdW   = document.createElement('td');
     tdW.className = 'wn-cell';
     const wnBtn = document.createElement('button');
-    wnBtn.className = `wn-btn${isSelWeek ? ' selected' : ''}`;
+    wnBtn.className   = `wn-btn${isSelWeek ? ' selected' : ''}`;
     wnBtn.textContent = `W${wn}`;
-    wnBtn.title = `${wy}年 第${wn}週を表示`;
+    wnBtn.title       = `${wy}年 第${wn}週を表示`;
     wnBtn.addEventListener('click', () => selectWeek(wy, wn));
     tdW.appendChild(wnBtn);
     tr.appendChild(tdW);
 
-    // 7日分
+    // 7日分セル
     for (let c = 0; c < 7; c++) {
-      const d  = cells[r*7+c];
+      const d  = cells[r * 7 + c];
       const td = document.createElement('td');
       if (!d) {
         td.innerHTML = '<div class="day empty"></div>';
@@ -117,13 +124,13 @@ function buildCal() {
         const isToday = d === today.getDate()
                      && cur.month === today.getMonth()
                      && cur.year  === today.getFullYear();
-        const isSel   = d === cur.selDay && cur.viewMode === 'day';
+        const isSel   = cur.viewMode === 'day' && d === cur.selDay;
 
         let cls = `day h${level}`;
         if (isToday) cls += ' today';
         if (isSel)   cls += ' selected';
 
-        td.innerHTML = `<div class="${cls}" title="${ds} ${count}件">${d}</div>`;
+        td.innerHTML = `<div class="${cls}" title="${ds}  ${count}件">${d}</div>`;
         td.querySelector('.day').addEventListener('click', () => selectDay(d));
       }
       tr.appendChild(td);
@@ -135,59 +142,157 @@ function buildCal() {
 }
 
 // =========================================================
-// 選択操作
+// 選択操作（カレンダー側から）
 // =========================================================
 
+/** カレンダーの日付セルをクリック */
 function selectDay(d) {
-  cur.selDay  = d;
-  cur.selWeek = null;
+  cur.selDay   = d;
+  cur.selWeek  = null;
   cur.viewMode = 'day';
+  syncTabLabel();
   setActiveTab('tab-day');
   buildCal();
   loadDay();
 }
 
+/** カレンダーの週番号ボタンをクリック */
 function selectWeek(year, week) {
-  cur.selWeek = { year, week };
-  cur.selDay  = null;
+  cur.selWeek  = { year, week };
+  cur.selDay   = null;
   cur.viewMode = 'week';
+  syncTabLabel();
   setActiveTab('tab-week');
   buildCal();
   loadWeek(year, week);
 }
 
+// =========================================================
+// view-tabs から切り替え（双方向連動）
+// =========================================================
+
+/**
+ * 遷移表（前モード → 後モード）で選択状態とカレンダー位置を決定する。
+ *
+ * 縮小方向（day←week←month←year）:
+ *   ← より細かい単位の先頭を選択
+ *   例: year → month = 1月を選択、month → week = 第1週を選択、week → day = 週の月曜を選択
+ *
+ * 拡大方向（day→week→month→year）:
+ *   → 選択中の期間を含む上位単位に移動
+ *   例: day → week = その日を含む週を選択
+ */
 function setViewMode(mode) {
-  cur.viewMode = mode;
-  buildCal();
-  if (mode === 'day')   loadDay();
-  if (mode === 'week' && cur.selWeek) loadWeek(cur.selWeek.year, cur.selWeek.week);
-  if (mode === 'month') loadMonth();
-  if (mode === 'year')  loadYear();
+  const prev = cur.viewMode;
+  if (prev === mode) return;
+
+  // ---- 拡大方向 ------------------------------------------------
+  if (mode === 'week') {
+    if (prev === 'day' && cur.selDay !== null) {
+      cur.selWeek = isoWeek(new Date(cur.year, cur.month, cur.selDay));
+    } else if (prev === 'month') {
+      cur.selWeek = isoWeek(new Date(cur.year, cur.month, 1));
+    } else if (prev === 'year') {
+      cur.month   = 0;
+      cur.selWeek = isoWeek(new Date(cur.year, 0, 1));
+      // Jan 1 が前年の週に入る場合も想定してカレンダーを週の月曜の月に合わせる
+      const mon = isoWeekFirstDay(cur.selWeek.year, cur.selWeek.week);
+      cur.year  = mon.getFullYear();
+      cur.month = mon.getMonth();
+    }
+    cur.selDay   = null;
+    cur.viewMode = 'week';
+    setActiveTab('tab-week');
+    syncTabLabel();
+    buildCal();
+    if (cur.selWeek) loadWeek(cur.selWeek.year, cur.selWeek.week);
+
+  } else if (mode === 'month') {
+    if (prev === 'week' && cur.selWeek) {
+      // 選択週の月曜が属する月へ移動
+      const mon  = isoWeekFirstDay(cur.selWeek.year, cur.selWeek.week);
+      cur.year   = mon.getFullYear();
+      cur.month  = mon.getMonth();
+    } else if (prev === 'year') {
+      cur.month  = 0;
+    }
+    cur.selDay   = null;
+    cur.selWeek  = null;
+    cur.viewMode = 'month';
+    setActiveTab('tab-month');
+    syncTabLabel();
+    buildCal();
+    loadMonth();
+
+  } else if (mode === 'year') {
+    // どこからでも: cur.year は維持
+    cur.selDay   = null;
+    cur.selWeek  = null;
+    cur.viewMode = 'year';
+    setActiveTab('tab-year');
+    syncTabLabel();
+    buildCal();
+    loadYear();
+
+  // ---- 縮小方向 ------------------------------------------------
+  } else if (mode === 'day') {
+    if (prev === 'week' && cur.selWeek) {
+      // 選択週の月曜を選択
+      const mon  = isoWeekFirstDay(cur.selWeek.year, cur.selWeek.week);
+      cur.year   = mon.getFullYear();
+      cur.month  = mon.getMonth();
+      cur.selDay = mon.getDate();
+    } else if (prev === 'month') {
+      cur.selDay = 1;                  // 月の1日を選択
+    } else if (prev === 'year') {
+      cur.month  = 0;
+      cur.selDay = 1;                  // 1月1日を選択
+    }
+    cur.selWeek  = null;
+    cur.viewMode = 'day';
+    setActiveTab('tab-day');
+    syncTabLabel();
+    buildCal();
+    loadDay();
+  }
 }
+
+// =========================================================
+// タブ UI ヘルパー
+// =========================================================
 
 function setActiveTab(id) {
   document.querySelectorAll('.view-tabs button').forEach(b => b.classList.remove('active'));
   document.getElementById(id)?.classList.add('active');
 }
 
+/** 週タブのラベルに現在の週番号を反映（"週 W12" など） */
+function syncTabLabel() {
+  const weekTab = document.getElementById('tab-week');
+  if (!weekTab) return;
+  weekTab.textContent = (cur.viewMode === 'week' && cur.selWeek)
+    ? `週 W${cur.selWeek.week}`
+    : '週';
+}
+
 function updateDetailTitle() {
   const el = document.getElementById('detail-title');
   if (!el) return;
-  if (cur.viewMode === 'day' && cur.selDay) {
+  if (cur.viewMode === 'day' && cur.selDay !== null) {
     const d   = new Date(cur.year, cur.month, cur.selDay);
     const dow = ['日','月','火','水','木','金','土'][d.getDay()];
-    el.textContent = `${cur.month+1}月${cur.selDay}日（${dow}）`;
+    el.textContent = `${cur.month + 1}月${cur.selDay}日（${dow}）`;
   } else if (cur.viewMode === 'week' && cur.selWeek) {
     el.textContent = `${cur.selWeek.year}年 第${cur.selWeek.week}週`;
   } else if (cur.viewMode === 'month') {
-    el.textContent = `${cur.year}年${cur.month+1}月`;
+    el.textContent = `${cur.year}年${cur.month + 1}月`;
   } else if (cur.viewMode === 'year') {
     el.textContent = `${cur.year}年`;
   }
 }
 
 // =========================================================
-// ナビゲーション
+// ナビゲーション（カレンダー上部の «‹›» 操作）
 // =========================================================
 
 function shiftMonth(n) {
@@ -196,15 +301,20 @@ function shiftMonth(n) {
   if (cur.month > 11) { cur.month = 0;  cur.year++; }
   buildCal();
 }
-function shiftYear(n)  { cur.year += n; buildCal(); }
+function shiftYear(n) { cur.year += n; buildCal(); }
+
 function goToday() {
   const t = new Date();
-  cur = { ...cur, year: t.getFullYear(), month: t.getMonth(),
-          selDay: t.getDate(), selWeek: null, viewMode: 'day' };
+  cur = {
+    year: t.getFullYear(), month: t.getMonth(),
+    selDay: t.getDate(), selWeek: null, viewMode: 'day',
+  };
   setActiveTab('tab-day');
+  syncTabLabel();
   buildCal();
   loadDay();
 }
+
 function onSelChange() {
   cur.month = parseInt(document.getElementById('sel-month').value);
   cur.year  = parseInt(document.getElementById('sel-year').value);
@@ -228,7 +338,7 @@ function showTimelineLoading() {
 }
 
 async function loadDay() {
-  if (!cur.selDay) return;
+  if (cur.selDay === null) return;
   const ds = dateStr(cur.year, cur.month, cur.selDay);
   showTimelineLoading();
   clearStats();
@@ -239,7 +349,7 @@ async function loadDay() {
     ]);
     renderStats(stats);
     renderTimeline(tl.entries, 'day');
-  } catch(e) {
+  } catch (e) {
     showTimelineError(e.message);
   }
 }
@@ -247,11 +357,11 @@ async function loadDay() {
 async function loadWeek(year, week) {
   showTimelineLoading();
   clearStats();
-  const weekStr = `${year}-W${String(week).padStart(2,'0')}`;
+  const weekStr = `${year}-W${String(week).padStart(2, '0')}`;
   try {
     const tl = await fetchJSON(`/api/timeline?period=week&date=${weekStr}`);
     renderTimeline(tl.entries, 'week');
-  } catch(e) {
+  } catch (e) {
     showTimelineError(e.message);
   }
 }
@@ -259,11 +369,11 @@ async function loadWeek(year, week) {
 async function loadMonth() {
   showTimelineLoading();
   clearStats();
-  const monthStr = `${cur.year}-${String(cur.month+1).padStart(2,'0')}`;
+  const monthStr = `${cur.year}-${String(cur.month + 1).padStart(2, '0')}`;
   try {
     const tl = await fetchJSON(`/api/timeline?period=month&date=${monthStr}`);
     renderTimeline(tl.entries, 'month');
-  } catch(e) {
+  } catch (e) {
     showTimelineError(e.message);
   }
 }
@@ -274,7 +384,7 @@ async function loadYear() {
   try {
     const tl = await fetchJSON(`/api/timeline?period=year&date=${cur.year}`);
     renderTimeline(tl.entries, 'year');
-  } catch(e) {
+  } catch (e) {
     showTimelineError(e.message);
   }
 }
@@ -286,7 +396,9 @@ async function loadYear() {
 function clearStats() {
   ['stat-posts','stat-plays','stat-steps','stat-weather'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) { el.querySelector('.stat-val').textContent = '—'; el.querySelector('.stat-src').textContent = ''; }
+    if (!el) return;
+    el.querySelector('.stat-val').textContent = '—';
+    el.querySelector('.stat-src').textContent = '';
   });
 }
 
@@ -297,24 +409,19 @@ function renderStats(s) {
     el.querySelector('.stat-val').textContent = val ?? '—';
     el.querySelector('.stat-src').textContent = sub ?? '';
   };
-
   set('stat-posts',
     s.posts != null ? s.posts.toLocaleString() : '—',
     s.posts_breakdown ?? '');
-
   set('stat-plays',
     s.plays != null ? s.plays.toLocaleString() : '—',
     'Last.fm');
-
   set('stat-steps',
     s.steps != null ? s.steps.toLocaleString() : '—',
     'Apple Watch');
-
   if (s.weather) {
     const desc = s.weather.desc ?? '';
     const temp = s.weather.temp != null ? `${s.weather.temp}°` : '';
-    set('stat-weather',
-      [desc, temp].filter(Boolean).join(' ') || '—',
+    set('stat-weather', [desc, temp].filter(Boolean).join(' ') || '—',
       s.weather.location ?? '');
   } else {
     set('stat-weather', '—', '');
@@ -322,22 +429,60 @@ function renderStats(s) {
 }
 
 // =========================================================
+// favicon フォールバック（グローバル関数として onerror から呼ぶ）
+// =========================================================
+
+window.onFaviconLoad = function(img) {
+  // naturalSize が 0 なら実質失敗（1x1 トラッキングピクセル等）と見なす
+  if (img.naturalWidth <= 1 && img.naturalHeight <= 1) {
+    window.onFaviconError(img);
+  }
+};
+
+window.onFaviconError = function(img) {
+  img.style.display = 'none';
+  const fallback = img.nextElementSibling;
+  if (fallback) fallback.style.removeProperty('display');
+};
+
+// =========================================================
 // タイムライン描画
 // =========================================================
+
+function faviconImgHTML(faviconUrl, emoji, extraCls) {
+  if (!faviconUrl) return `<span class="bicon${extraCls ? ' ' + extraCls : ''}">${emoji}</span>`;
+  return `<img src="${faviconUrl}" onload="onFaviconLoad(this)" onerror="onFaviconError(this)" alt="" loading="lazy">`
+       + `<span class="bicon" style="display:none">${emoji}</span>`;
+}
 
 function badgeHTML(source) {
   if (!source) return '<span class="tl-badge b-rss"><span class="bicon">🌐</span>?</span>';
   const cls = `b-${source.cls}`;
-  // favicon を img で試みる（失敗時は emoji にフォールバック）
-  const icon = source.favicon_url
-    ? `<img src="${source.favicon_url}" onerror="this.style.display='none';this.nextSibling.style.display='inline'" alt="">`
-      + `<span class="bicon" style="display:none">${source.emoji}</span>`
-    : `<span class="bicon">${source.emoji}</span>`;
+  const icon = faviconImgHTML(source.favicon_url, source.emoji);
   return `<span class="tl-badge ${cls}">${icon}${esc(source.short_name)}</span>`;
 }
 
 function esc(s) {
-  return (s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return (s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/** メディア添付の HTML を生成 */
+function mediaHTML(mediaList) {
+  if (!mediaList || !mediaList.length) return '';
+  const imgs = mediaList.map(m => {
+    const isVideo = (m.type || '').startsWith('video') || m.type === 'video' || m.type === 'gifv';
+    const thumb   = m.thumb || m.url;
+    if (isVideo) {
+      return `<a href="${esc(m.url)}" target="_blank" rel="noopener" class="tl-media-video" title="動画を開く">
+                <span class="tl-media-play">▶</span>
+                <img src="${esc(thumb)}" loading="lazy" alt="">
+              </a>`;
+    }
+    return `<a href="${esc(m.url)}" target="_blank" rel="noopener">
+              <img src="${esc(thumb)}" loading="lazy" alt="" class="tl-media-img">
+            </a>`;
+  });
+  return `<div class="tl-media">${imgs.join('')}</div>`;
 }
 
 function renderTimeline(entries, mode) {
@@ -365,18 +510,30 @@ function renderTimeline(entries, mode) {
       mainHTML = `<div class="tl-text">${esc(e.content)}</div>`;
     }
 
-    const timeLabel = mode === 'week' || mode === 'month'
+    const timeLabel = (mode === 'week' || mode === 'month' || mode === 'year')
       ? `${e.date.slice(5)} ${e.time}`
       : e.time;
 
     const linkHTML = e.url
-      ? ` <a href="${esc(e.url)}" target="_blank" rel="noopener" style="color:var(--color-text-info);font-size:10px">↗</a>`
+      ? ` <a href="${esc(e.url)}" target="_blank" rel="noopener"
+              style="color:var(--color-text-info);font-size:10px">↗</a>`
       : '';
 
-    return `<div class="tl-item" data-src="${e.source_id}">
+    // メディアフラグ（data 属性で applyFilter から参照）
+    const mediaMark = e.has_media ? ' data-media="1"' : '';
+
+    // メディア表示: URL あり→サムネイル、なし(has_media フラグのみ)→小アイコン
+    const mediaSection = e.media && e.media.length
+      ? mediaHTML(e.media)
+      : (e.has_media && e.url
+          ? `<span class="tl-media-hint" title="添付あり（投稿を開くと確認できます）">📎</span>`
+          : '');
+
+    return `<div class="tl-item" data-src="${e.source_id}"${mediaMark}>
       ${badge}
       <div class="tl-content">
         ${mainHTML}${linkHTML}
+        ${mediaSection}
         <div class="tl-time">${timeLabel}</div>
       </div>
     </div>`;
@@ -412,18 +569,29 @@ function filterAll() {
 function applyFilter() {
   let visible = 0;
   document.querySelectorAll('#timeline .tl-item').forEach(item => {
-    const id   = parseInt(item.dataset.src);
-    const show = activeIds.has(id);
+    const id        = parseInt(item.dataset.src);
+    const srcMatch  = activeIds.has(id);
+    const mediaMatch = !mediaFilter || item.dataset.media === '1';
+    const show = srcMatch && mediaMatch;
     item.classList.toggle('hidden', !show);
     if (show) visible++;
   });
+  const total = document.querySelectorAll('#timeline .tl-item').length;
   document.getElementById('no-items').style.display =
-    (visible === 0 && document.querySelectorAll('#timeline .tl-item').length > 0)
-      ? 'block' : 'none';
+    (visible === 0 && total > 0) ? 'block' : 'none';
+
+  // メディアフィルターボタンの見た目を同期
+  const mediaBtn = document.getElementById('media-filter-btn');
+  if (mediaBtn) mediaBtn.classList.toggle('on', mediaFilter);
+}
+
+function toggleMediaFilter() {
+  mediaFilter = !mediaFilter;
+  applyFilter();
 }
 
 // =========================================================
-// フィルターバー構築（JS で動的生成）
+// フィルターバー（動的生成）
 // =========================================================
 
 function buildFilterBar() {
@@ -431,22 +599,54 @@ function buildFilterBar() {
   if (!bar) return;
 
   const allBtn = document.createElement('button');
-  allBtn.className = 'filter-all';
+  allBtn.className   = 'filter-all';
   allBtn.textContent = 'すべて';
-  allBtn.onclick = filterAll;
+  allBtn.onclick     = filterAll;
   bar.appendChild(allBtn);
 
-  SOURCES.forEach(s => {
-    const btn = document.createElement('button');
-    btn.className = `ftag f-${s.cls} on`;
-    btn.dataset.src = s.id;
-    btn.title = s.name;
-    btn.onclick = () => toggleFilter(btn);
+  // メディアフィルターボタン（セパレーター扱い）
+  const sep = document.createElement('span');
+  sep.className = 'filter-sep';
+  bar.appendChild(sep);
 
-    const icon = document.createElement('span');
-    icon.className = 'ficon';
-    icon.textContent = s.emoji;
-    btn.appendChild(icon);
+  const mediaBtn = document.createElement('button');
+  mediaBtn.id        = 'media-filter-btn';
+  mediaBtn.className = 'ftag f-rss';
+  mediaBtn.title     = '画像・動画が添付された投稿のみ表示';
+  mediaBtn.onclick   = toggleMediaFilter;
+  mediaBtn.innerHTML = '<span class="ficon">📷</span>メディア';
+  bar.appendChild(mediaBtn);
+
+  // アクティブなソースのみフィルターバーに表示
+  SOURCES.filter(s => s.is_active !== false).forEach(s => {
+    const btn       = document.createElement('button');
+    btn.className   = `ftag f-${s.cls} on`;
+    btn.dataset.src = s.id;
+    btn.title       = s.name;
+    btn.onclick     = () => toggleFilter(btn);
+
+    if (s.favicon_url) {
+      const img  = document.createElement('img');
+      img.src    = s.favicon_url;
+      img.alt    = '';
+      img.loading = 'lazy';
+      img.addEventListener('load',  () => window.onFaviconLoad(img));
+      img.addEventListener('error', () => window.onFaviconError(img));
+
+      const emojiSpan       = document.createElement('span');
+      emojiSpan.className   = 'ficon';
+      emojiSpan.textContent = s.emoji;
+      emojiSpan.style.display = 'none';
+
+      btn.appendChild(img);
+      btn.appendChild(emojiSpan);
+    } else {
+      const icon       = document.createElement('span');
+      icon.className   = 'ficon';
+      icon.textContent = s.emoji;
+      btn.appendChild(icon);
+    }
+
     btn.appendChild(document.createTextNode(s.short_name));
     bar.appendChild(btn);
   });

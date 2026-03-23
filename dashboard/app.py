@@ -17,27 +17,28 @@ JST = timezone(timedelta(hours=9))
 
 # ソース表示名のドメイン→短縮名マッピング
 SHORT_NAME_MAP = {
-    "misskey.io":           "msk.io",
-    "tanoshii.site":        "tanoshii",
-    "sushi.ski":            "sushi.ski",
-    "mistodon.cloud":       "mistodon",
-    "mastodon.cloud":       "masto.cloud",
-    "msk.ilnk.info":        "ilnk",
+    "misskey.io":            "msk.io",
+    "tanoshii.site":         "tanoshii",
+    "sushi.ski":             "sushi.ski",
+    "mistodon.cloud":        "mistodon",
+    "mastodon.cloud":        "masto.cloud",
+    "msk.ilnk.info":         "ilnk",
+    "pon.icu":               "pon.icu",
+    "groundpolis.app":       "g.app",
     "yuinoid.neocities.org": "100%health",
-    "github.com":           "github",
 }
 
-# ソース種別ごとの CSS クラスと絵文字
+# ソース種別ごとの CSS クラス・絵文字・既知 favicon URL
 TYPE_INFO = {
-    "misskey":  {"cls": "msk",  "emoji": "🍣"},
-    "mastodon": {"cls": "mst",  "emoji": "🐘"},
-    "lastfm":   {"cls": "lfm",  "emoji": "🎵"},
-    "health":   {"cls": "hlth", "emoji": "🍎"},
-    "photo":    {"cls": "hlth", "emoji": "📷"},
-    "rss":      {"cls": "rss",  "emoji": "🌐"},
-    "weather":  {"cls": "rss",  "emoji": "☁️"},
-    "github":   {"cls": "rss",  "emoji": "🐱"},
-    "youtube":  {"cls": "rss",  "emoji": "▶️"},
+    "misskey":  {"cls": "msk",  "emoji": "🍣", "favicon": None},  # base_url から生成
+    "mastodon": {"cls": "mst",  "emoji": "🐘", "favicon": None},  # base_url から生成
+    "lastfm":   {"cls": "lfm",  "emoji": "🎵", "favicon": "https://www.last.fm/favicon.ico"},
+    "health":   {"cls": "hlth", "emoji": "🍎", "favicon": None},
+    "photo":    {"cls": "hlth", "emoji": "📷", "favicon": None},
+    "rss":      {"cls": "rss",  "emoji": "🌐", "favicon": None},  # base_url から生成
+    "weather":  {"cls": "rss",  "emoji": "☁️", "favicon": None},
+    "github":   {"cls": "rss",  "emoji": "🐱", "favicon": "https://github.com/favicon.ico"},
+    "youtube":  {"cls": "rss",  "emoji": "▶️", "favicon": "https://www.youtube.com/favicon.ico"},
 }
 
 
@@ -56,25 +57,29 @@ def get_db_conn():
 
 def make_source_info(row):
     """data_sources の行から表示用の dict を返す"""
-    sid, name, stype, base_url, account = row[0], row[1], row[2], row[3], row[4]
-    domain  = (base_url or "").replace("https://", "").replace("http://", "").rstrip("/")
-    info    = TYPE_INFO.get(stype, {"cls": "rss", "emoji": "🌐"})
-    favicon = f"{base_url}/favicon.ico" if base_url else None
+    sid       = row[0]
+    name      = row[1]
+    stype     = row[2]
+    base_url  = row[3]
+    account   = row[4]
+    is_active = row[5] if len(row) > 5 else True
 
-    if stype == "lastfm":
-        short_name = "last.fm"
-    elif stype == "health":
-        short_name = "health"
-    elif stype == "photo":
-        short_name = "photo"
-    elif stype == "weather":
-        short_name = "weather"
-    elif stype == "github":
-        short_name = "github"
-    elif stype == "youtube":
-        short_name = "youtube"
+    domain = (base_url or "").replace("https://", "").replace("http://", "").rstrip("/")
+    info   = TYPE_INFO.get(stype, {"cls": "rss", "emoji": "🌐", "favicon": None})
+
+    # 短縮名
+    fixed = {"lastfm": "last.fm", "health": "health", "photo": "photo",
+             "weather": "weather", "github": "github", "youtube": "youtube"}
+    short_name = fixed.get(stype) or SHORT_NAME_MAP.get(domain) or domain or name
+
+    # favicon URL の決定
+    # 廃止サーバー（is_active=False）はドメインが死んでいる可能性が高いので None
+    if not is_active:
+        favicon = None
+    elif base_url:
+        favicon = f"{base_url}/favicon.ico"
     else:
-        short_name = SHORT_NAME_MAP.get(domain, domain or name)
+        favicon = info.get("favicon")  # 種別別に既知 URL を使用
 
     return {
         "id":          sid,
@@ -84,6 +89,7 @@ def make_source_info(row):
         "cls":         info["cls"],
         "emoji":       info["emoji"],
         "favicon_url": favicon,
+        "is_active":   is_active,
     }
 
 
@@ -111,11 +117,10 @@ def create_app():
             """)
             heatmap = {str(r[0]): r[1] for r in cur.fetchall()}
 
-            # アクティブなソース一覧
+            # 全ソース（廃止含む）— タイムライン中の過去エントリのバッジ表示に必要
             cur.execute("""
-                SELECT id, name, type, base_url, account
+                SELECT id, name, type, base_url, account, is_active
                   FROM data_sources
-                 WHERE is_active
                  ORDER BY id
             """)
             sources = [make_source_info(r) for r in cur.fetchall()]
@@ -137,25 +142,26 @@ def create_app():
         conn = get_db_conn()
         cur  = conn.cursor()
         try:
+            # misskey_posts を LEFT JOIN して has_files（歴史データ分）も取得
+            SELECT_COLS = """
+                SELECT l.id, l.source_id, l.content, l.url,
+                       (l.timestamp AT TIME ZONE 'Asia/Tokyo') AS ts,
+                       l.metadata,
+                       COALESCE(mp.has_files, FALSE) AS msk_has_files
+                  FROM logs l
+                  LEFT JOIN misskey_posts mp ON mp.log_id = l.id
+            """
+
             if period == "day":
-                cur.execute("""
-                    SELECT l.id, l.source_id, l.content, l.url,
-                           (l.timestamp AT TIME ZONE 'Asia/Tokyo') AS ts,
-                           l.metadata
-                      FROM logs l
+                cur.execute(SELECT_COLS + """
                      WHERE l.is_deleted = FALSE
                        AND DATE(l.timestamp AT TIME ZONE 'Asia/Tokyo') = %s
                      ORDER BY l.timestamp
                 """, (date_arg,))
 
             elif period == "week":
-                # date_arg: "YYYY-WXX"
                 year_part, week_part = date_arg.split("-W")
-                cur.execute("""
-                    SELECT l.id, l.source_id, l.content, l.url,
-                           (l.timestamp AT TIME ZONE 'Asia/Tokyo') AS ts,
-                           l.metadata
-                      FROM logs l
+                cur.execute(SELECT_COLS + """
                      WHERE l.is_deleted = FALSE
                        AND EXTRACT(isoyear FROM l.timestamp AT TIME ZONE 'Asia/Tokyo') = %s
                        AND EXTRACT(week    FROM l.timestamp AT TIME ZONE 'Asia/Tokyo') = %s
@@ -164,12 +170,7 @@ def create_app():
                 """, (int(year_part), int(week_part)))
 
             elif period == "month":
-                # date_arg: "YYYY-MM"
-                cur.execute("""
-                    SELECT l.id, l.source_id, l.content, l.url,
-                           (l.timestamp AT TIME ZONE 'Asia/Tokyo') AS ts,
-                           l.metadata
-                      FROM logs l
+                cur.execute(SELECT_COLS + """
                      WHERE l.is_deleted = FALSE
                        AND TO_CHAR(l.timestamp AT TIME ZONE 'Asia/Tokyo', 'YYYY-MM') = %s
                      ORDER BY l.timestamp
@@ -177,12 +178,7 @@ def create_app():
                 """, (date_arg,))
 
             elif period == "year":
-                # date_arg: "YYYY"
-                cur.execute("""
-                    SELECT l.id, l.source_id, l.content, l.url,
-                           (l.timestamp AT TIME ZONE 'Asia/Tokyo') AS ts,
-                           l.metadata
-                      FROM logs l
+                cur.execute(SELECT_COLS + """
                      WHERE l.is_deleted = FALSE
                        AND EXTRACT(year FROM l.timestamp AT TIME ZONE 'Asia/Tokyo') = %s
                      ORDER BY l.timestamp
@@ -195,9 +191,13 @@ def create_app():
             rows    = cur.fetchall()
             entries = []
             for r in rows:
-                meta     = r[5] or {}
-                ts       = r[4]
-                is_boost = bool(meta.get("renote_id") or meta.get("reblog_id"))
+                meta       = r[5] or {}
+                ts         = r[4]
+                is_boost   = bool(meta.get("renote_id") or meta.get("reblog_id")
+                                  or meta.get("type") in ("renote", "boost"))
+                media      = meta.get("media") or []
+                # 旧データ（media 未保存）は has_files フラグだけ持っている
+                has_media  = bool(media) or bool(r[6])
                 entries.append({
                     "id":        r[0],
                     "source_id": r[1],
@@ -207,6 +207,8 @@ def create_app():
                     "date":      ts.strftime("%Y-%m-%d"),
                     "cw":        meta.get("cw"),
                     "is_boost":  is_boost,
+                    "media":     media,
+                    "has_media": has_media,
                 })
             return jsonify({"entries": entries, "count": len(entries)})
         finally:

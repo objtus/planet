@@ -61,7 +61,24 @@ def import_misskey(files: list[Path], instance: str, account: str, archived: boo
                     timestamp = parse_timestamp(item["published"])
                     visibility = get_misskey_visibility(item)
                     cw = item.get("summary") or None
-                    has_files = bool(item.get("attachment"))
+
+                    # ActivityPub attachment → media リスト
+                    media = [
+                        {
+                            "url":   a["url"],
+                            "type":  a.get("mediaType", ""),
+                            "thumb": a.get("url", ""),
+                        }
+                        for a in (item.get("attachment") or [])
+                        if a.get("url")
+                    ]
+                    has_files = bool(media)
+
+                    meta = {"type": "note", "visibility": visibility}
+                    if cw:
+                        meta["cw"] = cw
+                    if media:
+                        meta["media"] = media
 
                     cur.execute(
                         """INSERT INTO logs (source_id, original_id, content, url, timestamp, metadata)
@@ -69,7 +86,7 @@ def import_misskey(files: list[Path], instance: str, account: str, archived: boo
                            ON CONFLICT (source_id, original_id) DO NOTHING
                            RETURNING id""",
                         (source_id, post_id, content, url, timestamp,
-                         json.dumps({"type": "note", "visibility": visibility}))
+                         json.dumps(meta))
                     )
                     row = cur.fetchone()
                     if row is None:
