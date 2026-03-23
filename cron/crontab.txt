@@ -1,0 +1,19 @@
+# Planet 自動収集 cron設定
+# crontab -e で追加するか、crontab /home/objtus/planet/cron/crontab.txt で適用
+
+PLANET=/home/objtus/planet
+PYTHON=/home/objtus/planet/venv/bin/python
+LOG=/home/objtus/planet/cron/collect.log
+
+# Misskey・Mastodon: 1時間ごと
+0 * * * * cd $PLANET && $PYTHON -m collectors.misskey >> $LOG 2>&1
+5 * * * * cd $PLANET && $PYTHON -m collectors.mastodon >> $LOG 2>&1
+
+# Last.fm: 1時間ごと
+10 * * * * cd $PLANET && $PYTHON -m collectors.lastfm >> $LOG 2>&1
+
+# 天気・GitHub・RSS・YouTube: 1日1回 AM 6:00
+0 6 * * * cd $PLANET && $PYTHON -m collectors.weather >> $LOG 2>&1
+5 6 * * * cd $PLANET && $PYTHON -m collectors.github >> $LOG 2>&1
+10 6 * * * cd $PLANET && $PYTHON -m collectors.rss >> $LOG 2>&1
+15 6 * * * cd $PLANET && $PYTHON -m collectors.youtube >> $LOG 2>&1

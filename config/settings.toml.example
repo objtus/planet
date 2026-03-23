@@ -1,0 +1,52 @@
+[database]
+host     = "localhost"
+port     = 5432
+name     = "planet"
+user     = "planet"
+password = "password"
+
+[misskey.misskey_io]
+base_url = "https://misskey.io"
+token    = "YOUR_MISSKEY_IO_TOKEN"
+
+[misskey.tanoshii_site]
+base_url = "https://tanoshii.site"
+token    = "YOUR_TANOSHII_SITE_TOKEN"
+
+[mastodon.mistodon_cloud]
+base_url      = "https://mistodon.cloud"
+access_token  = "YOUR_MASTODON_ACCESS_TOKEN"
+
+[lastfm]
+api_key    = "YOUR_LASTFM_API_KEY"
+username   = "objtus"
+
+[openweathermap]
+api_key  = "YOUR_OPENWEATHERMAP_API_KEY"
+lat      = 35.6762
+lon      = 139.6503
+location = "Tokyo"
+
+[github]
+username = "YOUR_GITHUB_USERNAME"
+token    = "YOUR_GITHUB_PAT"
+
+[youtube]
+api_key    = "YOUR_YOUTUBE_API_KEY"
+channel_id = "YOUR_CHANNEL_ID"
+
+[rss]
+url = "https://yuinoid.neocities.org/rss.xml"
+
+[neocities]
+api_key = "YOUR_NEOCITIES_API_KEY"
+
+[ollama]
+base_url = "http://localhost:11434"
+model    = "gemma3:12b"
+
+[flask]
+secret_key = "change-this-to-a-random-string"
+host       = "0.0.0.0"
+port       = 5000
+debug      = false

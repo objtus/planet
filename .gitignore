@@ -1,0 +1,8 @@
+venv/
+config/settings.toml
+__pycache__/
+*.pyc
+*.pyo
+.env
+cron/collect.log
+*.log
