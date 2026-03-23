@@ -29,11 +29,11 @@ OllamaでAIサマリーを生成、Neocitiesの個人サイトに自動公開す
 
 ## データソース（現在登録済み）
 
-- Misskey: misskey.io @yuinoid / tanoshii.site @health
-- Mastodon: mistodon.cloud @healthcare
+- Misskey: misskey.io @yuinoid / tanoshii.site @health / misskey.io @vknsq / msk.ilnk.info @google / sushi.ski @idoko
+- Mastodon: mistodon.cloud @healthcare / mastodon.cloud @objtus
 - Last.fm: objtus
 - 個人サイト RSS: yuinoid.neocities.org/rss.xml
-- YouTube: 投稿動画
+- YouTube: 投稿動画（APIキー未取得・収集待ち）
 - OpenWeatherMap: 天気
 - GitHub: 開発活動
 - iPhone: 歩数・カロリー・心拍数・運動/スタンド / 写真メタデータ
@@ -50,6 +50,18 @@ OllamaでAIサマリーを生成、Neocitiesの個人サイトに自動公開す
 
 ---
 
+## ダッシュボード（Phase 5 実装済み）
+
+- URL: `http://<tailscale-ip>:5000`（`planet-dashboard.service` で起動）
+- 画面: カレンダー / 検索 / サマリー / 統計 / ソース管理
+- 月カレンダー形式のヒートマップ（投稿数を青の濃淡で表現）
+- 日・週・月・年の切り替えによるタイムライン表示
+- ソースフィルター（アカウント単位でオン/オフ）
+- CSS変数ベース（ライトテーマ・ダークモード自動切替）
+- `ingest/api.py` を統合済み（iPhone ショートカットからも引き続き利用可能）
+
+---
+
 ## ディレクトリ構成（簡略）
 
 ```
@@ -57,11 +69,16 @@ planet/
 ├── config/settings.toml     # APIキー等（gitignore対象）
 ├── collectors/              # 各ソースの収集スクリプト
 ├── importers/               # 過去JSONの一括インポート
-├── summarizer/              # Ollamaサマリー生成
-├── publisher/               # Neocities公開スクリプト
-├── dashboard/               # Flaskダッシュボード
-├── ingest/                  # iPhoneからのデータ受け取りAPI
-├── backup/                  # バックアップスクリプト
+├── ingest/                  # iPhoneからのデータ受け取り API（Blueprint）
+├── dashboard/               # Flaskダッシュボード（メインアプリ）
+│   ├── app.py
+│   ├── static/css/dashboard.css
+│   ├── static/js/calendar.js
+│   └── templates/
+├── mockup/                  # UI デザインモックアップ
+├── summarizer/              # Ollamaサマリー生成（未実装）
+├── publisher/               # Neocities公開スクリプト（未実装）
+├── backup/                  # バックアップスクリプト（未実装）
 └── docs/                    # ドキュメント群
 ```
 

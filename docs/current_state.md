@@ -1,14 +1,14 @@
 # 現在の実装状況
 
-**最終更新**: 2026-03-23（Phase 5 着手）
+**最終更新**: 2026-03-23（Phase 5 実装中）
 
 ---
 
 ## 完了済み
 
 - [x] 要件定義・設計（docs/design.md）
-- [x] ドキュメント整備（overview / decisions / next_tasks / api/ / importers.md）
-- [x] Claude Code セットアップ済み
+- [x] ドキュメント整備（overview / decisions / next_tasks / dashboard_ui / api/ / importers.md）
+- [x] モックアップ作成（mockup/calender_v3.html）
 
 ### Phase 1: 基盤構築（完了）
 
@@ -51,6 +51,8 @@
 - [x] mastodon.cloud @objtus: 12,383投稿 369BT
 - [x] logs合計: 36,175件（2025年12月末まで）
 
+---
+
 ### Phase 3: 自動収集（完了）
 
 - [x] collectors/base.py（共通基底クラス）
@@ -64,6 +66,8 @@
 - [x] collect_all.py（一括実行スクリプト）
 - [x] cron登録済み（cron/crontab.txt）
 
+---
+
 ### Phase 4: iPhone連携（完了）
 
 - [x] ingest/api.py 作成（Flask Blueprint）
@@ -73,7 +77,7 @@
   - `date` / `dates` どちらのキーでも受け付ける
   - `photo_json` / `photos_json` どちらのキーでも受け付ける
   - 位置情報の住所中の改行をスペース変換して JSON パース
-- [x] planet-ingest.service を systemd に登録・自動起動設定済み
+- [x] planet-dashboard.service に統合済み（planet-ingest.service は廃止）
 - [x] iPhoneショートカット 1（ヘルスデータ）実機で動作確認済み
 - [x] iPhoneショートカット 2（写真メタデータ）実機で動作確認済み
   - タイムスタンプ・位置情報（住所）・枚数を保存
@@ -87,22 +91,42 @@
 - 写真: ループ内で**辞書ではなくテキスト**を `変数に追加` するのがポイント（辞書を追加すると 0 件になる iOS Shortcuts の挙動）
 - `count` フィールドはダミー値 0 を送り、サーバー側で `photo_json` の要素数から実際の枚数を算出
 
+---
+
 ## 進行中
 
-### Phase 5: ダッシュボード（実装中）
+### Phase 5: ダッシュボード（実装中・デザイン調整中）
 
-- [x] `dashboard/app.py` 作成（Flask骨格 + `ingest_bp` 統合）
-- [x] `dashboard/templates/base.html`（ダークテーマ・ナビ）
-- [x] `dashboard/templates/calendar.html`（ヒートマップ + タイムライン Ajax）
-- [x] `dashboard/templates/timeline.html`
+#### 完了済み（Phase 5）
+
+- [x] `dashboard/app.py`（Flask 本体 + ingest_bp 統合・全ルート実装）
+  - `/` — カレンダー画面
+  - `/search` — 検索
+  - `/summaries` — サマリー一覧
+  - `/stats` — 統計
+  - `/sources` — ソース管理（有効/無効トグル）
+  - `/api/timeline` — タイムライン JSON API（day/week/month/year）
+  - `/api/stats` — 統計 JSON API（投稿数・再生数・歩数・天気）
+  - `/api/ingest`・`/api/health` — iPhone ingest（Phase 4 Blueprint）
+- [x] `dashboard/static/css/dashboard.css`（CSS変数ベース・ライト/ダーク自動切替）
+- [x] `dashboard/static/js/calendar.js`（カレンダーロジック全体・フィルター・タイムライン描画）
+- [x] `dashboard/templates/base.html`（ナビ・共通レイアウト）
+- [x] `dashboard/templates/calendar.html`（月カレンダーグリッド + 詳細パネル）
 - [x] `dashboard/templates/search.html`
 - [x] `dashboard/templates/summaries.html`
-- [x] `dashboard/templates/stats.html`（Chart.js 月別グラフ・ソース別バー）
-- [x] `dashboard/templates/sources.html`（有効/無効トグル）
-- [x] `planet-dashboard.service` 作成（`planet-ingest.service` を統合・廃止）
-- [ ] pg_bigm 全文検索への切り替え（現在 LIKE 検索）
-- [ ] タイムライン：週/月/年表示の実装
-- [ ] サマリー公開トグル（is_published）
+- [x] `dashboard/templates/stats.html`（Chart.js 月別積み上げグラフ・ソース別バー）
+- [x] `dashboard/templates/sources.html`（トグルスイッチ）
+- [x] `planet-dashboard.service` systemd 登録・自動起動設定済み
+- [x] `planet-ingest.service` 廃止（dashboard に統合）
+
+#### 残タスク（Phase 5）
+
+- [ ] デザイン・UI の細部調整（mockup/calender_v3.html との差分修正）
+- [ ] 検索: LIKE → pg_bigm 全文検索に切り替え
+- [ ] カレンダー: 週/月/年ビューの詳細実装（サマリー表示・集計など）
+- [ ] サマリー: 公開トグル（is_published の更新 API）
+
+---
 
 ## 未着手
 
@@ -117,6 +141,7 @@
 - 過去JSONはMisskey・Mastodon両方とも同一構造（announce/type: Noteの混在）
 - ブーストをインポートするかは settings.toml の include_boosts で制御
 - YouTube収集スクリプトは後回し（APIキー未取得）
+- mastodon.cloud @objtus の収集が不調（原因未調査）
 
 ---
 
@@ -127,8 +152,56 @@
 - PostgreSQL 16.13 + pg_bigm v1.2-20250903
 - Tailscale インストール済み
 - Ollama + Open WebUI インストール済み
-- Claude Code インストール済み・認証済み
 - 仮想環境: /home/objtus/planet/venv
+- 稼働サービス: `planet-dashboard.service`（ポート 5000）
+
+---
+
+## ディレクトリ構成（現在）
+
+```
+planet/
+├── config/settings.toml
+├── collectors/
+│   ├── base.py
+│   ├── misskey.py / mastodon.py / lastfm.py
+│   ├── weather.py / github.py / rss.py / youtube.py
+│   └── ogp_worker.py
+├── importers/
+│   ├── misskey_json.py
+│   └── mastodon_json.py
+├── ingest/
+│   └── api.py                  # Flask Blueprint（dashboard に統合済み）
+├── dashboard/
+│   ├── app.py                  # Flask 本体
+│   ├── planet-dashboard.service
+│   ├── static/
+│   │   ├── css/dashboard.css
+│   │   └── js/calendar.js
+│   └── templates/
+│       ├── base.html
+│       ├── calendar.html
+│       ├── search.html
+│       ├── summaries.html
+│       ├── stats.html
+│       ├── sources.html
+│       └── timeline.html
+├── mockup/
+│   └── calender_v3.html        # UI デザインモックアップ
+├── docs/
+│   ├── overview.md
+│   ├── current_state.md        # このファイル
+│   ├── next_tasks.md
+│   ├── design.md
+│   ├── dashboard_ui.md
+│   ├── decisions.md
+│   ├── importers.md
+│   ├── iphone_shortcuts.md
+│   ├── setup.md
+│   └── api/
+└── cron/
+    └── crontab.txt
+```
 
 ---
 
