@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Planet Dashboard Mockup - calendar_v3</title>
+<style>
+:root {
+  --font-sans: system-ui, sans-serif;
+  --color-text-primary: #1a1a1a;
+  --color-text-secondary: #666;
+  --color-text-tertiary: #999;
+  --color-text-info: #185FA5;
+  --color-background-primary: #fff;
+  --color-background-secondary: #f5f5f3;
+  --color-background-info: #E6F1FB;
+  --color-border-tertiary: rgba(0,0,0,0.12);
+  --color-border-secondary: rgba(0,0,0,0.25);
+  --color-border-info: #378ADD;
+  --border-radius-md: 8px;
+  --border-radius-lg: 12px;
+}
+body { background: #f0ede8; padding: 1.5rem; font-family: var(--font-sans); }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+button { background: transparent; border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-md); cursor: pointer; color: var(--color-text-primary); font-family: var(--font-sans); }
+button:hover { background: var(--color-background-secondary); }
+select { border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-md); background: var(--color-background-primary); color: var(--color-text-primary); font-family: var(--font-sans); }
+.wrap { padding: 1rem; font-family: var(--font-sans); max-width: 680px; margin: 0 auto; background: var(--color-background-primary); border-radius: var(--border-radius-lg); border: 0.5px solid var(--color-border-tertiary); }
+.cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+.date-nav { display: flex; align-items: center; gap: 4px; }
+.date-nav button { font-size: 12px; padding: 3px 8px; }
+.date-nav select { font-size: 12px; padding: 3px 6px; }
+.cal-grid { width: 100%; border-collapse: separate; border-spacing: 2px; }
+.cal-grid th { font-size: 11px; color: var(--color-text-secondary); font-weight: 400; text-align: center; padding: 0 0 4px; width: 40px; }
+.cal-grid th.wn { width: 42px; }
+.cal-grid td { text-align: center; vertical-align: top; padding: 0; }
+.cal-grid td.wn-cell { padding: 2px 4px 2px 0; vertical-align: middle; }
+.wn-btn { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 22px; border-radius: 20px; font-size: 10px; font-weight: 500; cursor: pointer; border: 0.5px solid var(--color-border-secondary); color: var(--color-text-secondary); background: var(--color-background-secondary); transition: all 0.1s; white-space: nowrap; }
+.wn-btn:hover { background: var(--color-background-info); color: var(--color-text-info); border-color: var(--color-border-info); }
+.day { width: 32px; height: 32px; border-radius: var(--border-radius-md); display: inline-flex; align-items: center; justify-content: center; font-size: 12px; cursor: pointer; color: var(--color-text-primary); }
+.day:hover { background: var(--color-background-secondary); }
+.day.other { color: var(--color-text-tertiary); }
+.day.today { font-weight: 500; border: 1.5px solid var(--color-border-info); color: var(--color-text-info); }
+.day.selected { background: var(--color-background-info); color: var(--color-text-info); font-weight: 500; }
+.day.empty { cursor: default; } .day.empty:hover { background: transparent; }
+.h0{} .h1{background:#E6F1FB;} .h2{background:#B5D4F4;} .h3{background:#85B7EB;} .h4{background:#378ADD;color:#fff;} .h5{background:#185FA5;color:#fff;}
+.legend { display: flex; align-items: center; gap: 6px; margin: 8px 0 0 46px; }
+.legend span { font-size: 10px; color: var(--color-text-tertiary); }
+.lbox { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+.detail { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 1rem 1.25rem; margin-top: 1rem; }
+.detail-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+.detail-title { font-size: 14px; font-weight: 500; color: var(--color-text-primary); }
+.view-tabs { display: flex; gap: 4px; }
+.view-tabs button { font-size: 12px; padding: 3px 10px; }
+.view-tabs button.active { background: var(--color-background-info); color: var(--color-text-info); border-color: var(--color-border-info); }
+.stat-row { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 8px; margin-bottom: 12px; }
+.stat-card { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 10px; }
+.stat-label { font-size: 11px; color: var(--color-text-secondary); margin-bottom: 4px; }
+.stat-val { font-size: 18px; font-weight: 500; color: var(--color-text-primary); }
+.stat-src { font-size: 10px; color: var(--color-text-tertiary); margin-top: 2px; }
+.filter-bar { display: flex; align-items: center; gap: 5px; margin-bottom: 10px; flex-wrap: wrap; }
+.filter-label { font-size: 11px; color: var(--color-text-secondary); margin-right: 2px; }
+.ftag { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 3px 8px; border-radius: 20px; border: 0.5px solid var(--color-border-tertiary); cursor: pointer; color: var(--color-text-secondary); background: transparent; }
+.ftag .ficon { font-size: 12px; line-height: 1; }
+.ftag.on { border-width: 1px; }
+.ftag.f-msk.on  { background:#E1F5EE; color:#0F6E56; border-color:#5DCAA5; }
+.ftag.f-mst.on  { background:#EEEDFE; color:#3C3489; border-color:#AFA9EC; }
+.ftag.f-lfm.on  { background:#FCEBEB; color:#A32D2D; border-color:#F09595; }
+.ftag.f-hlth.on { background:#FAEEDA; color:#854F0B; border-color:#EF9F27; }
+.ftag.f-rss.on  { background:#EAF3DE; color:#3B6D11; border-color:#97C459; }
+.filter-all { font-size: 11px; padding: 3px 9px; border-radius: 20px; border: 0.5px solid var(--color-border-tertiary); cursor: pointer; color: var(--color-text-secondary); background: transparent; }
+.filter-all:hover { background: var(--color-background-secondary); }
+.timeline { display: flex; flex-direction: column; gap: 5px; }
+.tl-item { display: flex; align-items: flex-start; gap: 8px; padding: 7px 10px; border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-tertiary); }
+.tl-item:hover { background: var(--color-background-secondary); }
+.tl-item.hidden { display: none; }
+.tl-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 500; padding: 2px 6px; border-radius: 20px; white-space: nowrap; margin-top: 1px; line-height: 1.5; flex-shrink: 0; }
+.tl-badge .bicon { font-size: 11px; line-height: 1; }
+.b-msk  { background:#E1F5EE; color:#0F6E56; }
+.b-mst  { background:#EEEDFE; color:#3C3489; }
+.b-lfm  { background:#FCEBEB; color:#A32D2D; }
+.b-hlth { background:#FAEEDA; color:#854F0B; }
+.b-rss  { background:#EAF3DE; color:#3B6D11; }
+.tl-content { flex: 1; min-width: 0; }
+.tl-text { font-size: 13px; color: var(--color-text-primary); line-height: 1.5; }
+.tl-sub  { font-size: 11px; color: var(--color-text-secondary); margin-top: 1px; }
+.tl-time { font-size: 11px; color: var(--color-text-tertiary); margin-top: 2px; }
+.no-items { font-size: 13px; color: var(--color-text-tertiary); padding: 12px 4px; display: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="cal-header">
+    <div class="date-nav">
+      <button onclick="shiftYear(-1)">«</button>
+      <button onclick="shiftMonth(-1)">‹</button>
+      <select id="sel-month" onchange="onSelChange()"></select>
+      <select id="sel-year"  onchange="onSelChange()"></select>
+      <button onclick="shiftMonth(1)">›</button>
+      <button onclick="shiftYear(1)">»</button>
+    </div>
+    <button onclick="goToday()">今日</button>
+  </div>
+
+  <table class="cal-grid">
+    <thead>
+      <tr>
+        <th class="wn"></th>
+        <th>月</th><th>火</th><th>水</th><th>木</th><th>金</th><th>土</th><th>日</th>
+      </tr>
+    </thead>
+    <tbody id="cal-body"></tbody>
+  </table>
+
+  <div class="legend">
+    <span>投稿数</span>
+    <div class="lbox" style="border:0.5px solid rgba(0,0,0,0.12)"></div>
+    <div class="lbox" style="background:#E6F1FB"></div>
+    <div class="lbox" style="background:#B5D4F4"></div>
+    <div class="lbox" style="background:#85B7EB"></div>
+    <div class="lbox" style="background:#378ADD"></div>
+    <div class="lbox" style="background:#185FA5"></div>
+    <span>少 → 多</span>
+  </div>
+
+  <div class="detail">
+    <div class="detail-header">
+      <span class="detail-title" id="detail-title">3月24日（月）</span>
+      <div class="view-tabs">
+        <button class="active">日</button>
+        <button>週 W13</button>
+        <button>月</button>
+        <button>年</button>
+      </div>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat-card"><div class="stat-label">投稿数</div><div class="stat-val">12</div><div class="stat-src">Misskey 8 / Mastodon 4</div></div>
+      <div class="stat-card"><div class="stat-label">再生曲数</div><div class="stat-val">34</div><div class="stat-src">Last.fm</div></div>
+      <div class="stat-card"><div class="stat-label">歩数</div><div class="stat-val">7,842</div><div class="stat-src">Apple Watch</div></div>
+      <div class="stat-card"><div class="stat-label">天気</div><div class="stat-val" style="font-size:14px">晴れ 18°</div><div class="stat-src">名古屋</div></div>
+    </div>
+
+    <div class="filter-bar">
+      <span class="filter-label">ソース</span>
+      <button class="filter-all" onclick="filterAll()">すべて</button>
+      <button class="ftag f-msk on"  data-src="msk"  onclick="toggleFilter(this)"><span class="ficon">🍣</span>msk.io</button>
+      <button class="ftag f-msk on"  data-src="msk2" onclick="toggleFilter(this)"><span class="ficon">🌿</span>tanoshii</button>
+      <button class="ftag f-msk on"  data-src="msk3" onclick="toggleFilter(this)"><span class="ficon">🍣</span>sushi.ski</button>
+      <button class="ftag f-mst on"  data-src="mst"  onclick="toggleFilter(this)"><span class="ficon">🐘</span>mistodon</button>
+      <button class="ftag f-mst on"  data-src="mst2" onclick="toggleFilter(this)"><span class="ficon">🐘</span>masto.cloud</button>
+      <button class="ftag f-lfm on"  data-src="lfm"  onclick="toggleFilter(this)"><span class="ficon">🎵</span>last.fm</button>
+      <button class="ftag f-hlth on" data-src="hlth" onclick="toggleFilter(this)"><span class="ficon">🍎</span>health</button>
+      <button class="ftag f-rss on"  data-src="rss"  onclick="toggleFilter(this)"><span class="ficon">🌐</span>100%health</button>
+    </div>
+
+    <div class="timeline" id="timeline">
+      <div class="tl-item" data-src="msk">
+        <span class="tl-badge b-msk"><span class="bicon">🍣</span>msk.io</span>
+        <div class="tl-content"><div class="tl-text">らくがきしたい</div><div class="tl-time">10:32</div></div>
+      </div>
+      <div class="tl-item" data-src="lfm">
+        <span class="tl-badge b-lfm"><span class="bicon">🎵</span>last.fm</span>
+        <div class="tl-content"><div class="tl-text">Tame Impala — Feels Like We Only Go Backwards</div><div class="tl-time">11:04</div></div>
+      </div>
+      <div class="tl-item" data-src="msk2">
+        <span class="tl-badge b-msk"><span class="bicon">🌿</span>tanoshii</span>
+        <div class="tl-content"><div class="tl-text">雑記を増やしていきたい</div><div class="tl-time">12:15</div></div>
+      </div>
+      <div class="tl-item" data-src="mst">
+        <span class="tl-badge b-mst"><span class="bicon">🐘</span>mistodon</span>
+        <div class="tl-content"><div class="tl-sub">BT: 情報のドブ川</div><div class="tl-time">13:21</div></div>
+      </div>
+      <div class="tl-item" data-src="msk3">
+        <span class="tl-badge b-msk"><span class="bicon">🍣</span>sushi.ski</span>
+        <div class="tl-content"><div class="tl-text">逆にね、どうでもよくなってきたよ、逆にね</div><div class="tl-time">14:50</div></div>
+      </div>
+      <div class="tl-item" data-src="mst2">
+        <span class="tl-badge b-mst"><span class="bicon">🐘</span>masto.cloud</span>
+        <div class="tl-content"><div class="tl-text">LTLのふいんき、これくらいがちょうどいいな</div><div class="tl-time">15:30</div></div>
+      </div>
+      <div class="tl-item" data-src="rss">
+        <span class="tl-badge b-rss"><span class="bicon">🌐</span>100%health</span>
+        <div class="tl-content"><div class="tl-text">雑記: 個人サイトを更新しました</div><div class="tl-time">16:00</div></div>
+      </div>
+      <div class="tl-item" data-src="msk">
+        <span class="tl-badge b-msk"><span class="bicon">🍣</span>msk.io</span>
+        <div class="tl-content"><div class="tl-text">スレッド含めおもしろい</div><div class="tl-time">16:36</div></div>
+      </div>
+      <div class="tl-item" data-src="hlth">
+        <span class="tl-badge b-hlth"><span class="bicon">🍎</span>health</span>
+        <div class="tl-content"><div class="tl-text">歩数 7,842歩 / 消費 420kcal / 心拍 72bpm</div><div class="tl-time">23:00</div></div>
+      </div>
+    </div>
+    <div class="no-items" id="no-items">表示できる項目がありません</div>
+  </div>
+</div>
+
+<script>
+const MONTHS = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+let cur = { year: 2026, month: 2, day: 23 };
+
+function isoWeek(d) {
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dn = t.getUTCDay() || 7;
+  t.setUTCDate(t.getUTCDate() + 4 - dn);
+  const y = t.getUTCFullYear();
+  const w1 = new Date(Date.UTC(y, 0, 4));
+  return 1 + Math.round(((t - w1) / 86400000 - 3 + (w1.getUTCDay() || 7)) / 7);
+}
+
+function heat(d) {
+  return [0,1,2,3,4,5,3,2,1,2,3,4,5,3,2,1,0,2,3,4,2,1,0,2,3,1,2,3,2,1,2][d] || 0;
+}
+
+function buildCal() {
+  const selM = document.getElementById('sel-month');
+  const selY = document.getElementById('sel-year');
+  selM.innerHTML = MONTHS.map((m,i) => `<option value="${i}"${i===cur.month?' selected':''}>${m}</option>`).join('');
+  selY.innerHTML = Array.from({length:20},(_,i)=>2017+i).map(y=>`<option value="${y}"${y===cur.year?' selected':''}>${y}年</option>`).join('');
+
+  const body = document.getElementById('cal-body');
+  body.innerHTML = '';
+  const first = new Date(cur.year, cur.month, 1);
+  const last  = new Date(cur.year, cur.month+1, 0);
+  const startDow = (first.getDay() + 6) % 7;
+  const today = new Date();
+
+  let cells = [];
+  for (let i = 0; i < startDow; i++) cells.push(null);
+  for (let d = 1; d <= last.getDate(); d++) cells.push(d);
+  while (cells.length % 7) cells.push(null);
+
+  for (let r = 0; r < cells.length / 7; r++) {
+    const tr = document.createElement('tr');
+    const refDay = cells[r*7] || (1 - startDow + r*7);
+    const wn = isoWeek(new Date(cur.year, cur.month, refDay));
+    const tdW = document.createElement('td');
+    tdW.className = 'wn-cell';
+    tdW.innerHTML = `<span class="wn-btn">W${wn}</span>`;
+    tr.appendChild(tdW);
+
+    for (let c = 0; c < 7; c++) {
+      const d = cells[r*7+c];
+      const td = document.createElement('td');
+      if (!d) {
+        td.innerHTML = '<div class="day empty"></div>';
+      } else {
+        const isToday = d === today.getDate() && cur.month === today.getMonth() && cur.year === today.getFullYear();
+        const isSel   = d === cur.day + 1;
+        const h = heat(d);
+        let cls = `day h${h}`;
+        if (isToday) cls += ' today';
+        if (isSel)   cls += ' selected';
+        td.innerHTML = `<div class="${cls}" onclick="selectDay(${d})">${d}</div>`;
+      }
+      tr.appendChild(td);
+    }
+    body.appendChild(tr);
+  }
+  updateDetailTitle();
+}
+
+function updateDetailTitle() {
+  const d = new Date(cur.year, cur.month, cur.day + 1);
+  const dow = ['日','月','火','水','木','金','土'][d.getDay()];
+  document.getElementById('detail-title').textContent = `${cur.month+1}月${cur.day+1}日（${dow}）`;
+}
+
+function selectDay(d) { cur.day = d - 1; buildCal(); }
+function shiftMonth(n) {
+  cur.month += n;
+  if (cur.month < 0)  { cur.month = 11; cur.year--; }
+  if (cur.month > 11) { cur.month = 0;  cur.year++; }
+  buildCal();
+}
+function shiftYear(n) { cur.year += n; buildCal(); }
+function goToday() {
+  const t = new Date();
+  cur = { year: t.getFullYear(), month: t.getMonth(), day: t.getDate() - 1 };
+  buildCal();
+}
+function onSelChange() {
+  cur.month = parseInt(document.getElementById('sel-month').value);
+  cur.year  = parseInt(document.getElementById('sel-year').value);
+  buildCal();
+}
+function toggleFilter(btn) { btn.classList.toggle('on'); applyFilter(); }
+function filterAll() { document.querySelectorAll('.ftag').forEach(b => b.classList.add('on')); applyFilter(); }
+function applyFilter() {
+  const active = new Set([...document.querySelectorAll('.ftag.on')].map(b => b.dataset.src));
+  let visible = 0;
+  document.querySelectorAll('#timeline .tl-item').forEach(item => {
+    const show = active.has(item.dataset.src);
+    item.classList.toggle('hidden', !show);
+    if (show) visible++;
+  });
+  document.getElementById('no-items').style.display = visible === 0 ? 'block' : 'none';
+}
+buildCal();
+</script>
+</body>
+</html>

@@ -1,0 +1,623 @@
+/* =========================================================
+   Planet Dashboard — dashboard.css
+   Light theme by default, dark via prefers-color-scheme
+   ========================================================= */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+
+  /* テキスト */
+  --color-text-primary:   #1a1a1a;
+  --color-text-secondary: #666;
+  --color-text-tertiary:  #999;
+  --color-text-info:      #185FA5;
+
+  /* 背景 */
+  --color-bg-body:              #f0ede8;
+  --color-background-primary:   #fff;
+  --color-background-secondary: #f5f5f3;
+  --color-background-info:      #E6F1FB;
+
+  /* ボーダー */
+  --color-border-tertiary:  rgba(0,0,0,0.12);
+  --color-border-secondary: rgba(0,0,0,0.25);
+  --color-border-info:      #378ADD;
+
+  /* ヒートマップ */
+  --heat-1: #E6F1FB;
+  --heat-2: #B5D4F4;
+  --heat-3: #85B7EB;
+  --heat-4: #378ADD;
+  --heat-5: #185FA5;
+
+  /* 共通 */
+  --border-radius-md: 8px;
+  --border-radius-lg: 12px;
+  --nav-height: 44px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-text-primary:   #e6edf3;
+    --color-text-secondary: #8b949e;
+    --color-text-tertiary:  #6e7681;
+    --color-text-info:      #79c0ff;
+
+    --color-bg-body:              #0d1117;
+    --color-background-primary:   #161b22;
+    --color-background-secondary: #21262d;
+    --color-background-info:      #1c3049;
+
+    --color-border-tertiary:  rgba(255,255,255,0.1);
+    --color-border-secondary: rgba(255,255,255,0.2);
+    --color-border-info:      #388bfd;
+
+    --heat-1: #0e4429;
+    --heat-2: #006d32;
+    --heat-3: #26a641;
+    --heat-4: #39d353;
+    --heat-5: #39d353;
+  }
+}
+
+/* =========================================================
+   BASE
+   ========================================================= */
+
+body {
+  font-family: var(--font-sans);
+  background: var(--color-bg-body);
+  color: var(--color-text-primary);
+  min-height: 100vh;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+a { color: inherit; text-decoration: none; }
+
+button {
+  background: transparent;
+  border: 0.5px solid var(--color-border-secondary);
+  border-radius: var(--border-radius-md);
+  cursor: pointer;
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  line-height: 1;
+}
+button:hover { background: var(--color-background-secondary); }
+
+select {
+  border: 0.5px solid var(--color-border-secondary);
+  border-radius: var(--border-radius-md);
+  background: var(--color-background-primary);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  cursor: pointer;
+}
+
+/* =========================================================
+   NAV
+   ========================================================= */
+
+.site-nav {
+  background: var(--color-background-primary);
+  border-bottom: 0.5px solid var(--color-border-tertiary);
+  height: var(--nav-height);
+  display: flex;
+  align-items: center;
+  padding: 0 1.25rem;
+  gap: 0;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.nav-brand {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--color-text-primary);
+  text-decoration: none;
+  margin-right: 1.25rem;
+}
+
+.nav-link {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  padding: 4px 10px;
+  border-radius: var(--border-radius-md);
+  transition: color 0.1s, background 0.1s;
+}
+.nav-link:hover  { color: var(--color-text-primary); background: var(--color-background-secondary); }
+.nav-link.active { color: var(--color-text-info); background: var(--color-background-info); }
+
+/* =========================================================
+   PAGE LAYOUT
+   ========================================================= */
+
+.page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem;
+}
+
+.page-wide {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem;
+}
+
+/* =========================================================
+   CARD
+   ========================================================= */
+
+.card {
+  background: var(--color-background-primary);
+  border-radius: var(--border-radius-lg);
+  border: 0.5px solid var(--color-border-tertiary);
+  padding: 1rem 1.25rem;
+}
+
+/* =========================================================
+   CALENDAR
+   ========================================================= */
+
+.cal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.date-nav { display: flex; align-items: center; gap: 4px; }
+.date-nav button { font-size: 12px; padding: 3px 8px; }
+.date-nav select { font-size: 12px; padding: 3px 6px; }
+
+.cal-grid {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 2px;
+}
+
+.cal-grid th {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  font-weight: 400;
+  text-align: center;
+  padding: 0 0 4px;
+  width: 40px;
+}
+.cal-grid th.wn { width: 46px; }
+
+.cal-grid td {
+  text-align: center;
+  vertical-align: top;
+  padding: 0;
+}
+.cal-grid td.wn-cell {
+  padding: 2px 4px 2px 0;
+  vertical-align: middle;
+}
+
+/* 週番号ピル */
+.wn-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 22px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 0.5px solid var(--color-border-secondary);
+  color: var(--color-text-secondary);
+  background: var(--color-background-secondary);
+  transition: all 0.1s;
+  white-space: nowrap;
+}
+.wn-btn:hover {
+  background: var(--color-background-info);
+  color: var(--color-text-info);
+  border-color: var(--color-border-info);
+}
+.wn-btn.selected {
+  background: var(--color-background-info);
+  color: var(--color-text-info);
+  border-color: var(--color-border-info);
+}
+
+/* 日付セル */
+.day {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--border-radius-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--color-text-primary);
+  transition: background 0.08s;
+}
+.day:hover    { background: var(--color-background-secondary); }
+.day.other    { color: var(--color-text-tertiary); }
+.day.today    { font-weight: 500; border: 1.5px solid var(--color-border-info); color: var(--color-text-info); }
+.day.selected { background: var(--color-background-info); color: var(--color-text-info); font-weight: 500; }
+.day.empty    { cursor: default; }
+.day.empty:hover { background: transparent; }
+
+/* ヒートマップ段階 */
+.h0 { }
+.h1 { background: var(--heat-1); }
+.h2 { background: var(--heat-2); }
+.h3 { background: var(--heat-3); }
+.h4 { background: var(--heat-4); color: #fff; }
+.h5 { background: var(--heat-5); color: #fff; }
+
+/* 凡例 */
+.legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 0 46px;
+}
+.legend span { font-size: 10px; color: var(--color-text-tertiary); }
+.lbox {
+  width: 12px; height: 12px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+/* =========================================================
+   DETAIL PANEL
+   ========================================================= */
+
+.detail {
+  background: var(--color-background-primary);
+  border: 0.5px solid var(--color-border-tertiary);
+  border-radius: var(--border-radius-lg);
+  padding: 1rem 1.25rem;
+  margin-top: 1rem;
+}
+
+.detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.detail-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+/* 表示モードタブ */
+.view-tabs { display: flex; gap: 4px; }
+.view-tabs button { font-size: 12px; padding: 3px 10px; }
+.view-tabs button.active {
+  background: var(--color-background-info);
+  color: var(--color-text-info);
+  border-color: var(--color-border-info);
+}
+
+/* =========================================================
+   STAT CARDS
+   ========================================================= */
+
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0,1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.stat-card {
+  background: var(--color-background-secondary);
+  border-radius: var(--border-radius-md);
+  padding: 10px;
+}
+.stat-label { font-size: 11px; color: var(--color-text-secondary); margin-bottom: 4px; }
+.stat-val   { font-size: 18px; font-weight: 500; color: var(--color-text-primary); }
+.stat-src   { font-size: 10px; color: var(--color-text-tertiary); margin-top: 2px; }
+
+/* =========================================================
+   FILTER BAR
+   ========================================================= */
+
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.filter-label {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  margin-right: 2px;
+  flex-shrink: 0;
+}
+
+.filter-all {
+  font-size: 11px;
+  padding: 3px 9px;
+  border-radius: 20px;
+  border: 0.5px solid var(--color-border-tertiary);
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  background: transparent;
+}
+.filter-all:hover { background: var(--color-background-secondary); }
+
+.ftag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 20px;
+  border: 0.5px solid var(--color-border-tertiary);
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  background: transparent;
+  transition: all 0.1s;
+}
+.ftag .ficon { font-size: 12px; line-height: 1; }
+.ftag.on { border-width: 1px; }
+
+/* ソース種別カラー */
+.ftag.f-msk.on  { background:#E1F5EE; color:#0F6E56; border-color:#5DCAA5; }
+.ftag.f-mst.on  { background:#EEEDFE; color:#3C3489; border-color:#AFA9EC; }
+.ftag.f-lfm.on  { background:#FCEBEB; color:#A32D2D; border-color:#F09595; }
+.ftag.f-hlth.on { background:#FAEEDA; color:#854F0B; border-color:#EF9F27; }
+.ftag.f-rss.on  { background:#EAF3DE; color:#3B6D11; border-color:#97C459; }
+
+/* =========================================================
+   TIMELINE
+   ========================================================= */
+
+.timeline { display: flex; flex-direction: column; gap: 5px; }
+
+.tl-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: var(--border-radius-md);
+  border: 0.5px solid var(--color-border-tertiary);
+  transition: background 0.08s;
+}
+.tl-item:hover { background: var(--color-background-secondary); }
+.tl-item.hidden { display: none; }
+
+.tl-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 2px 6px;
+  border-radius: 20px;
+  white-space: nowrap;
+  margin-top: 1px;
+  line-height: 1.5;
+  flex-shrink: 0;
+}
+.tl-badge img {
+  width: 12px; height: 12px;
+  border-radius: 2px;
+  object-fit: contain;
+}
+.tl-badge .bicon { font-size: 11px; line-height: 1; }
+
+.b-msk  { background:#E1F5EE; color:#0F6E56; }
+.b-mst  { background:#EEEDFE; color:#3C3489; }
+.b-lfm  { background:#FCEBEB; color:#A32D2D; }
+.b-hlth { background:#FAEEDA; color:#854F0B; }
+.b-rss  { background:#EAF3DE; color:#3B6D11; }
+
+.tl-content { flex: 1; min-width: 0; }
+.tl-text { font-size: 13px; color: var(--color-text-primary); line-height: 1.5; word-break: break-word; }
+.tl-sub  { font-size: 11px; color: var(--color-text-secondary); margin-top: 1px; word-break: break-word; }
+.tl-time { font-size: 11px; color: var(--color-text-tertiary); margin-top: 2px; }
+
+.no-items {
+  font-size: 13px;
+  color: var(--color-text-tertiary);
+  padding: 12px 4px;
+  display: none;
+}
+
+.tl-loading {
+  font-size: 13px;
+  color: var(--color-text-tertiary);
+  padding: 20px 0;
+  text-align: center;
+}
+
+/* CW 折りたたみ */
+details summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  list-style: none;
+}
+details summary::before {
+  content: "▶ ";
+  font-size: 10px;
+}
+details[open] summary::before { content: "▼ "; }
+
+/* =========================================================
+   SEARCH PAGE
+   ========================================================= */
+
+.search-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 1rem;
+}
+.search-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.search-input {
+  flex: 1;
+  min-width: 180px;
+  padding: 6px 10px;
+  border: 0.5px solid var(--color-border-secondary);
+  border-radius: var(--border-radius-md);
+  background: var(--color-background-primary);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  outline: none;
+}
+.search-input:focus { border-color: var(--color-border-info); }
+
+.btn-primary {
+  padding: 6px 14px;
+  background: var(--color-background-info);
+  color: var(--color-text-info);
+  border-color: var(--color-border-info);
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: var(--border-radius-md);
+}
+.btn-primary:hover { opacity: 0.85; }
+
+.filter-select {
+  padding: 5px 8px;
+  font-size: 12px;
+  background: var(--color-background-primary);
+  color: var(--color-text-secondary);
+}
+
+.result-meta {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  margin-bottom: 8px;
+}
+
+/* =========================================================
+   STATS PAGE
+   ========================================================= */
+
+.section-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  margin-bottom: 10px;
+}
+
+.bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.bar-track {
+  flex: 1;
+  height: 8px;
+  background: var(--color-background-secondary);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.bar-fill {
+  height: 100%;
+  background: var(--heat-4);
+  border-radius: 4px;
+}
+.bar-label { font-size: 11px; color: var(--color-text-secondary); min-width: 120px; }
+.bar-value { font-size: 11px; color: var(--color-text-tertiary); min-width: 48px; text-align: right; font-variant-numeric: tabular-nums; }
+
+/* =========================================================
+   SOURCES PAGE
+   ========================================================= */
+
+.sources-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.sources-table th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--color-text-tertiary);
+  padding: 6px 10px;
+  border-bottom: 0.5px solid var(--color-border-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.sources-table td {
+  padding: 8px 10px;
+  border-bottom: 0.5px solid var(--color-border-tertiary);
+  color: var(--color-text-primary);
+  vertical-align: middle;
+}
+.sources-table tr:last-child td { border-bottom: none; }
+.sources-table tr:hover td { background: var(--color-background-secondary); }
+
+.toggle-btn {
+  position: relative;
+  width: 36px; height: 20px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s;
+  padding: 0;
+}
+.toggle-btn[data-active="true"]  { background: var(--color-border-info); }
+.toggle-btn[data-active="false"] { background: var(--color-border-secondary); }
+.toggle-knob {
+  position: absolute;
+  top: 2px;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  transition: left 0.15s;
+}
+.toggle-btn[data-active="true"]  .toggle-knob { left: 18px; }
+.toggle-btn[data-active="false"] .toggle-knob { left: 2px; }
+
+/* =========================================================
+   SUMMARIES PAGE
+   ========================================================= */
+
+.summary-item {
+  margin-bottom: 12px;
+}
+.summary-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.summary-date { font-size: 13px; font-weight: 500; }
+.summary-content {
+  font-size: 13px;
+  color: var(--color-text-primary);
+  white-space: pre-wrap;
+  line-height: 1.6;
+}
+.pill {
+  display: inline-block;
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  border: 0.5px solid var(--color-border-tertiary);
+  color: var(--color-text-secondary);
+}
+.pill-week { background: var(--color-background-info); color: var(--color-text-info); border-color: var(--color-border-info); }
+.pill-pub  { background: #E1F5EE; color: #0F6E56; border-color: #5DCAA5; }
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+
+@media (max-width: 600px) {
+  .stat-row { grid-template-columns: repeat(2, 1fr); }
+  .page, .page-wide { padding: 1rem 0.75rem; }
+  .cal-grid th, .cal-grid td { font-size: 11px; }
+}

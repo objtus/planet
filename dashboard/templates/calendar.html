@@ -1,205 +1,102 @@
 {% extends "base.html" %}
 {% block title %}カレンダー — Planet{% endblock %}
 
-{% block head %}
-<style>
-  .heat-0 { background: #161b22; }
-  .heat-1 { background: #0e4429; }
-  .heat-2 { background: #006d32; }
-  .heat-3 { background: #26a641; }
-  .heat-4 { background: #39d353; }
-  .day-cell {
-    width: 12px; height: 12px; border-radius: 2px; cursor: pointer;
-    transition: outline 0.1s;
-  }
-  .day-cell:hover { outline: 1px solid #58a6ff; }
-  .day-cell.today { outline: 1px solid #f0883e; }
-</style>
-{% endblock %}
-
 {% block content %}
-<div class="flex items-center justify-between mb-6">
-  <h1 class="text-lg font-semibold text-white">カレンダー</h1>
-  <span class="text-[#8b949e] text-sm">累計 <span class="text-white font-mono">{{ "{:,}".format(total_logs) }}</span> 件</span>
-</div>
+<div class="page">
 
-<!-- ヒートマップ -->
-<div class="bg-[#161b22] border border-[#21262d] rounded-lg p-5 mb-6">
-  <div class="flex items-end gap-[3px]" id="heatmap-container">
-    <!-- JS で生成 -->
-  </div>
-  <div class="flex items-center gap-2 mt-3 justify-end text-xs text-[#8b949e]">
-    <span>少</span>
-    <span class="w-3 h-3 rounded-sm heat-0 border border-[#30363d]"></span>
-    <span class="w-3 h-3 rounded-sm heat-1"></span>
-    <span class="w-3 h-3 rounded-sm heat-2"></span>
-    <span class="w-3 h-3 rounded-sm heat-3"></span>
-    <span class="w-3 h-3 rounded-sm heat-4"></span>
-    <span>多</span>
-  </div>
-</div>
+  <!-- カレンダーカード -->
+  <div class="card">
+    <div class="cal-header">
+      <div class="date-nav">
+        <button onclick="shiftYear(-1)" title="前の年">«</button>
+        <button onclick="shiftMonth(-1)" title="前の月">‹</button>
+        <select id="sel-month" onchange="onSelChange()"></select>
+        <select id="sel-year"  onchange="onSelChange()"></select>
+        <button onclick="shiftMonth(1)" title="次の月">›</button>
+        <button onclick="shiftYear(1)"  title="次の年">»</button>
+      </div>
+      <button onclick="goToday()">今日</button>
+    </div>
 
-<!-- タイムライン表示エリア -->
-<div id="timeline-area">
-  <div class="text-[#8b949e] text-sm">日付をクリックするとタイムラインを表示します</div>
+    <table class="cal-grid">
+      <thead>
+        <tr>
+          <th class="wn"></th>
+          <th>月</th><th>火</th><th>水</th><th>木</th><th>金</th><th>土</th><th>日</th>
+        </tr>
+      </thead>
+      <tbody id="cal-body"></tbody>
+    </table>
+
+    <div class="legend">
+      <span>投稿数</span>
+      <div class="lbox" style="border:0.5px solid rgba(0,0,0,0.12)"></div>
+      <div class="lbox" style="background:var(--heat-1)"></div>
+      <div class="lbox" style="background:var(--heat-2)"></div>
+      <div class="lbox" style="background:var(--heat-3)"></div>
+      <div class="lbox" style="background:var(--heat-4)"></div>
+      <div class="lbox" style="background:var(--heat-5)"></div>
+      <span>少 → 多</span>
+    </div>
+  </div>
+
+  <!-- 詳細パネル -->
+  <div class="detail">
+    <div class="detail-header">
+      <span class="detail-title" id="detail-title"></span>
+      <div class="view-tabs">
+        <button id="tab-day"   class="active" onclick="setViewMode('day')">日</button>
+        <button id="tab-week"  onclick="setViewMode('week')">週</button>
+        <button id="tab-month" onclick="setViewMode('month')">月</button>
+        <button id="tab-year"  onclick="setViewMode('year')">年</button>
+      </div>
+    </div>
+
+    <!-- 統計カード（日ビュー時に表示） -->
+    <div class="stat-row" id="stat-row">
+      <div class="stat-card" id="stat-posts">
+        <div class="stat-label">投稿数</div>
+        <div class="stat-val">—</div>
+        <div class="stat-src"></div>
+      </div>
+      <div class="stat-card" id="stat-plays">
+        <div class="stat-label">再生曲数</div>
+        <div class="stat-val">—</div>
+        <div class="stat-src">Last.fm</div>
+      </div>
+      <div class="stat-card" id="stat-steps">
+        <div class="stat-label">歩数</div>
+        <div class="stat-val">—</div>
+        <div class="stat-src">Apple Watch</div>
+      </div>
+      <div class="stat-card" id="stat-weather">
+        <div class="stat-label">天気</div>
+        <div class="stat-val">—</div>
+        <div class="stat-src"></div>
+      </div>
+    </div>
+
+    <!-- ソースフィルター -->
+    <div class="filter-bar" id="filter-bar">
+      <span class="filter-label">ソース</span>
+      <!-- JS で動的生成 -->
+    </div>
+
+    <!-- タイムライン -->
+    <div class="timeline" id="timeline">
+      <div class="tl-loading">読み込み中…</div>
+    </div>
+    <div class="no-items" id="no-items">表示できる項目がありません</div>
+  </div>
+
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-const heatmap = {{ heatmap | tojson }};
-const today   = "{{ today }}";
-
-function heatLevel(count) {
-  if (!count)   return 0;
-  if (count < 5)  return 1;
-  if (count < 15) return 2;
-  if (count < 40) return 3;
-  return 4;
-}
-
-function buildHeatmap() {
-  const container = document.getElementById('heatmap-container');
-  // 365日前〜今日
-  const end   = new Date(today);
-  const start = new Date(end);
-  start.setDate(start.getDate() - 364);
-
-  // ISO曜日(月=0〜日=6)
-  const dow = (d) => (d.getDay() + 6) % 7;
-
-  // 月ラベル列を追跡
-  let weekCols = [];
-  let currentWeek = [];
-  let lastMonth = -1;
-  const monthLabels = {};
-
-  let d = new Date(start);
-  // 週の頭（月曜）まで遡る
-  const pad = dow(d);
-  d.setDate(d.getDate() - pad);
-
-  let weekIndex = 0;
-  while (d <= end || currentWeek.length > 0) {
-    const dateStr = d.toISOString().slice(0, 10);
-    const inRange = d >= start && d <= end;
-    const count   = inRange ? (heatmap[dateStr] || 0) : null;
-    const level   = count !== null ? heatLevel(count) : -1;
-
-    // 月ラベル
-    if (inRange && d.getDate() === 1) {
-      monthLabels[weekIndex] = d.toLocaleString('ja-JP', { month: 'short' });
-    }
-
-    currentWeek.push({ dateStr, level, count, inRange });
-
-    if (currentWeek.length === 7) {
-      weekCols.push(currentWeek);
-      currentWeek = [];
-      weekIndex++;
-    }
-    d.setDate(d.getDate() + 1);
-    if (d > end && currentWeek.length === 0) break;
-  }
-  if (currentWeek.length) weekCols.push(currentWeek);
-
-  // DOM 構築
-  // 月ラベル行
-  const labelRow = document.createElement('div');
-  labelRow.className = 'flex gap-[3px] mb-1';
-  weekCols.forEach((_, wi) => {
-    const span = document.createElement('div');
-    span.style.width = '12px';
-    span.style.minWidth = '12px';
-    span.className = 'text-[10px] text-[#8b949e] overflow-hidden whitespace-nowrap';
-    span.textContent = monthLabels[wi] || '';
-    labelRow.appendChild(span);
-  });
-  container.appendChild(labelRow);
-
-  // セル本体（週列 × 曜日行）
-  const grid = document.createElement('div');
-  grid.className = 'flex gap-[3px]';
-  weekCols.forEach((week) => {
-    const col = document.createElement('div');
-    col.className = 'flex flex-col gap-[3px]';
-    week.forEach(({ dateStr, level, count, inRange }) => {
-      const cell = document.createElement('div');
-      cell.className = `day-cell heat-${level < 0 ? 0 : level}`;
-      if (!inRange) cell.style.opacity = '0';
-      if (dateStr === today) cell.classList.add('today');
-      if (inRange) {
-        cell.title = `${dateStr}  ${count ?? 0}件`;
-        cell.dataset.date = dateStr;
-        cell.addEventListener('click', () => loadTimeline(dateStr));
-      }
-      col.appendChild(cell);
-    });
-    grid.appendChild(col);
-  });
-  container.appendChild(grid);
-}
-
-async function loadTimeline(date) {
-  const area = document.getElementById('timeline-area');
-  area.innerHTML = '<div class="text-[#8b949e] text-sm py-4">読み込み中…</div>';
-  try {
-    const res  = await fetch(`/timeline?period=day&date=${date}`, {
-      headers: { 'X-Requested-With': 'XMLHttpRequest' }
-    });
-    const data = await res.json();
-    renderTimeline(date, data.entries, data.count);
-  } catch(e) {
-    area.innerHTML = `<div class="text-red-400 text-sm py-4">エラー: ${e.message}</div>`;
-  }
-}
-
-function sourceClass(type) {
-  const map = {
-    misskey: 'source-misskey', mastodon: 'source-mastodon',
-    lastfm: 'source-lastfm',   health: 'source-health',
-    photo: 'source-photo',     weather: 'source-weather',
-    github: 'source-github',   rss: 'source-rss', youtube: 'source-youtube',
-  };
-  return map[type] || 'source-github';
-}
-
-function renderTimeline(date, entries, count) {
-  const area = document.getElementById('timeline-area');
-  const lines = entries.map(e => {
-    const cw   = e.metadata.cw;
-    const body = e.content ? e.content.replace(/</g,'&lt;').replace(/>/g,'&gt;') : '';
-    const link = e.url ? `<a href="${e.url}" target="_blank" rel="noopener" class="text-[#58a6ff] hover:underline text-xs ml-2">↗</a>` : '';
-
-    let inner;
-    if (cw) {
-      inner = `<details class="inline"><summary class="cursor-pointer text-[#8b949e]">${cw.replace(/</g,'&lt;')}</summary><p class="mt-1 text-[#e6edf3]">${body}</p></details>`;
-    } else {
-      inner = `<span class="text-[#e6edf3]">${body}</span>`;
-    }
-
-    return `<div class="flex gap-3 py-2 border-b border-[#21262d] items-start">
-      <span class="text-[#8b949e] font-mono text-xs w-12 shrink-0 pt-0.5">${e.timestamp}</span>
-      <div class="flex-1 min-w-0 text-sm leading-relaxed">
-        ${inner}${link}
-      </div>
-      <span class="source-badge ${sourceClass(e.source_type)} shrink-0">${e.source_type}</span>
-    </div>`;
-  }).join('');
-
-  area.innerHTML = `
-    <div class="flex items-center justify-between mb-3">
-      <h2 class="text-white font-semibold">${date}</h2>
-      <span class="text-[#8b949e] text-sm">${count} 件</span>
-    </div>
-    <div class="bg-[#161b22] border border-[#21262d] rounded-lg px-4 divide-y divide-[#21262d]">
-      ${count > 0 ? lines : '<p class="text-[#8b949e] text-sm py-4">この日の記録はありません</p>'}
-    </div>
-  `;
-}
-
-buildHeatmap();
-// 今日のタイムラインをデフォルト表示
-loadTimeline(today);
+const HEATMAP = {{ heatmap | tojson }};
+const SOURCES = {{ sources | tojson }};
+const TODAY   = "{{ today }}";
 </script>
+<script src="{{ url_for('static', filename='js/calendar.js') }}"></script>
 {% endblock %}

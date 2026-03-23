@@ -2,44 +2,38 @@
 {% block title %}ソース管理 — Planet{% endblock %}
 
 {% block content %}
-<h1 class="text-lg font-semibold text-white mb-4">ソース管理</h1>
-
-<div class="bg-[#161b22] border border-[#21262d] rounded-lg overflow-hidden">
-  <table class="w-full text-sm">
-    <thead>
-      <tr class="border-b border-[#21262d] text-[#8b949e] text-xs uppercase tracking-wide">
-        <th class="text-left px-4 py-2.5">ID</th>
-        <th class="text-left px-4 py-2.5">名前</th>
-        <th class="text-left px-4 py-2.5">種別</th>
-        <th class="text-left px-4 py-2.5">アカウント</th>
-        <th class="text-left px-4 py-2.5">追加日</th>
-        <th class="text-center px-4 py-2.5">有効</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for item in items %}
-      <tr class="border-b border-[#21262d] last:border-0 hover:bg-[#1c2128] transition-colors">
-        <td class="px-4 py-2.5 text-[#8b949e] font-mono">{{ item.id }}</td>
-        <td class="px-4 py-2.5 text-white">{{ item.name }}</td>
-        <td class="px-4 py-2.5">
-          <span class="source-badge source-{{ item.type }}">{{ item.type }}</span>
-        </td>
-        <td class="px-4 py-2.5 text-[#8b949e] font-mono text-xs">{{ item.account or '—' }}</td>
-        <td class="px-4 py-2.5 text-[#8b949e] text-xs">{{ item.created_at }}</td>
-        <td class="px-4 py-2.5 text-center">
-          <button
-            onclick="toggleSource({{ item.id }}, this)"
-            data-active="{{ 'true' if item.is_active else 'false' }}"
-            class="w-10 h-5 rounded-full transition-colors relative focus:outline-none
-              {% if item.is_active %}bg-[#238636]{% else %}bg-[#30363d]{% endif %}">
-            <span class="absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform
-              {% if item.is_active %}left-5{% else %}left-0.5{% endif %}"></span>
-          </button>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+<div class="page-wide">
+  <div class="card" style="padding:0">
+    <table class="sources-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>名前</th>
+          <th>種別</th>
+          <th>アカウント</th>
+          <th>追加日</th>
+          <th style="text-align:center">有効</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        <tr>
+          <td style="color:var(--color-text-tertiary);font-size:11px;font-variant-numeric:tabular-nums">{{ item.id }}</td>
+          <td>{{ item.name }}</td>
+          <td><span style="font-size:11px;color:var(--color-text-secondary)">{{ item.type }}</span></td>
+          <td style="font-size:11px;color:var(--color-text-tertiary);font-family:monospace">{{ item.account or '—' }}</td>
+          <td style="font-size:11px;color:var(--color-text-tertiary)">{{ item.created_at }}</td>
+          <td style="text-align:center">
+            <button class="toggle-btn" data-active="{{ 'true' if item.is_active else 'false' }}"
+                    onclick="toggleSource({{ item.id }}, this)">
+              <span class="toggle-knob"></span>
+            </button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 {% endblock %}
 
@@ -49,13 +43,7 @@ async function toggleSource(id, btn) {
   const res  = await fetch(`/sources/${id}/toggle`, { method: 'POST' });
   const data = await res.json();
   if (data.error) { alert(data.error); return; }
-  const active = data.is_active;
-  btn.dataset.active = active;
-  btn.className = btn.className
-    .replace(/bg-\[#238636\]|bg-\[#30363d\]/, active ? 'bg-[#238636]' : 'bg-[#30363d]');
-  const dot = btn.querySelector('span');
-  dot.className = dot.className
-    .replace(/left-5|left-0\.5/, active ? 'left-5' : 'left-0.5');
+  btn.dataset.active = data.is_active ? 'true' : 'false';
 }
 </script>
 {% endblock %}

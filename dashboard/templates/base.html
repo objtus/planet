@@ -4,60 +4,21 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}Planet{% endblock %}</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          colors: {
-            surface: '#0f1117',
-            panel:   '#161b22',
-            border:  '#21262d',
-            muted:   '#8b949e',
-          }
-        }
-      }
-    }
-  </script>
-  <style>
-    body { background-color: #0f1117; color: #e6edf3; }
-    .nav-link { @apply text-[#8b949e] hover:text-white transition-colors px-3 py-2 rounded text-sm; }
-    .nav-link.active { @apply text-white bg-[#21262d]; }
-    ::-webkit-scrollbar { width: 6px; height: 6px; }
-    ::-webkit-scrollbar-track { background: #0f1117; }
-    ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
-    .source-badge { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.04em; }
-    .source-misskey   { background: #a37bff22; color: #a37bff; border: 1px solid #a37bff44; }
-    .source-mastodon  { background: #6364ff22; color: #8b8bff; border: 1px solid #6364ff44; }
-    .source-lastfm    { background: #d5100222; color: #e8503a; border: 1px solid #d5100244; }
-    .source-health    { background: #3fb95022; color: #58d668; border: 1px solid #3fb95044; }
-    .source-photo     { background: #f0883e22; color: #f0a060; border: 1px solid #f0883e44; }
-    .source-weather   { background: #58a6ff22; color: #79c0ff; border: 1px solid #58a6ff44; }
-    .source-github    { background: #30363d44; color: #8b949e; border: 1px solid #30363d; }
-    .source-rss       { background: #ffa64022; color: #ffbe70; border: 1px solid #ffa64044; }
-    .source-youtube   { background: #ff000022; color: #ff6b6b; border: 1px solid #ff000044; }
-  </style>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
   {% block head %}{% endblock %}
 </head>
-<body class="min-h-screen flex flex-col">
+<body>
 
-  <!-- ナビゲーション -->
-  <nav class="border-b border-[#21262d] bg-[#161b22] sticky top-0 z-50">
-    <div class="max-w-6xl mx-auto px-4 flex items-center h-12 gap-1">
-      <a href="{{ url_for('calendar') }}" class="font-bold text-white mr-4 text-sm tracking-widest">⬡ PLANET</a>
-      <a href="{{ url_for('calendar') }}"  class="nav-link {% if request.endpoint == 'calendar' %}active{% endif %}">カレンダー</a>
-      <a href="{{ url_for('search') }}"    class="nav-link {% if request.endpoint == 'search' %}active{% endif %}">検索</a>
-      <a href="{{ url_for('summaries') }}" class="nav-link {% if request.endpoint == 'summaries' %}active{% endif %}">サマリー</a>
-      <a href="{{ url_for('stats') }}"     class="nav-link {% if request.endpoint == 'stats' %}active{% endif %}">統計</a>
-      <a href="{{ url_for('sources') }}"   class="nav-link {% if request.endpoint == 'sources' %}active{% endif %}">ソース管理</a>
-    </div>
+  <nav class="site-nav">
+    <a href="{{ url_for('calendar') }}" class="nav-brand">⬡ PLANET</a>
+    <a href="{{ url_for('calendar') }}"  class="nav-link {% if request.endpoint == 'calendar' %}active{% endif %}">カレンダー</a>
+    <a href="{{ url_for('search') }}"    class="nav-link {% if request.endpoint == 'search' %}active{% endif %}">検索</a>
+    <a href="{{ url_for('summaries') }}" class="nav-link {% if request.endpoint == 'summaries' %}active{% endif %}">サマリー</a>
+    <a href="{{ url_for('stats') }}"     class="nav-link {% if request.endpoint == 'stats' %}active{% endif %}">統計</a>
+    <a href="{{ url_for('sources') }}"   class="nav-link {% if request.endpoint == 'sources' %}active{% endif %}">ソース管理</a>
   </nav>
 
-  <!-- メインコンテンツ -->
-  <main class="flex-1 max-w-6xl mx-auto w-full px-4 py-6">
-    {% block content %}{% endblock %}
-  </main>
+  {% block content %}{% endblock %}
 
   {% block scripts %}{% endblock %}
 </body>

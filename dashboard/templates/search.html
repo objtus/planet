@@ -2,55 +2,52 @@
 {% block title %}検索 — Planet{% endblock %}
 
 {% block content %}
-<h1 class="text-lg font-semibold text-white mb-4">検索</h1>
-
-<form method="get" class="bg-[#161b22] border border-[#21262d] rounded-lg p-4 mb-5 flex flex-col gap-3">
-  <div class="flex gap-2">
-    <input type="text" name="q" value="{{ q }}" placeholder="キーワード…"
-      class="flex-1 bg-[#0f1117] border border-[#30363d] rounded px-3 py-2 text-sm text-white placeholder-[#8b949e] focus:outline-none focus:border-[#58a6ff]">
-    <button type="submit"
-      class="bg-[#238636] hover:bg-[#2ea043] text-white text-sm px-4 py-2 rounded transition-colors">検索</button>
+<div class="page">
+  <div class="card">
+    <form method="get" class="search-form">
+      <div class="search-row">
+        <input type="text" name="q" value="{{ q }}" placeholder="キーワードを入力…" class="search-input" autofocus>
+        <button type="submit" class="btn-primary">検索</button>
+      </div>
+      <div class="search-row">
+        <select name="source_id" class="filter-select">
+          <option value="">すべてのソース</option>
+          {% for s in sources %}
+          <option value="{{ s[0] }}" {% if source_id == s[0]|string %}selected{% endif %}>{{ s[1] }}</option>
+          {% endfor %}
+        </select>
+        <input type="date" name="date_from" value="{{ date_from }}" class="filter-select">
+        <span style="font-size:12px;color:var(--color-text-tertiary)">〜</span>
+        <input type="date" name="date_to"   value="{{ date_to }}"   class="filter-select">
+      </div>
+    </form>
   </div>
-  <div class="flex gap-3 flex-wrap">
-    <select name="source_id"
-      class="bg-[#0f1117] border border-[#30363d] rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:border-[#58a6ff]">
-      <option value="">すべてのソース</option>
-      {% for s in sources %}
-      <option value="{{ s[0] }}" {% if source_id == s[0]|string %}selected{% endif %}>{{ s[1] }}</option>
-      {% endfor %}
-    </select>
-    <input type="date" name="date_from" value="{{ date_from }}"
-      class="bg-[#0f1117] border border-[#30363d] rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:border-[#58a6ff]">
-    <span class="text-[#8b949e] self-center text-sm">〜</span>
-    <input type="date" name="date_to" value="{{ date_to }}"
-      class="bg-[#0f1117] border border-[#30363d] rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:border-[#58a6ff]">
-  </div>
-</form>
 
-{% if q %}
-<div class="text-[#8b949e] text-sm mb-3">「{{ q }}」— {{ total }} 件</div>
-<div class="bg-[#161b22] border border-[#21262d] rounded-lg px-4">
-  {% for e in entries %}
-  <div class="flex gap-3 py-2.5 border-b border-[#21262d] last:border-0 items-start">
-    <span class="text-[#8b949e] font-mono text-xs w-36 shrink-0 pt-0.5">{{ e.timestamp }}</span>
-    <div class="flex-1 min-w-0 text-sm leading-relaxed break-words">
-      {% if e.metadata.get('cw') %}
-      <details>
-        <summary class="cursor-pointer text-[#8b949e]">{{ e.metadata.cw }}</summary>
-        <p class="mt-1">{{ e.content }}</p>
-      </details>
+  {% if q %}
+  <div class="result-meta" style="margin-top:12px">「{{ q }}」— {{ total }} 件</div>
+  <div class="card" style="padding:0.5rem 1rem">
+    <div class="timeline">
+      {% for e in entries %}
+      <div class="tl-item">
+        <span class="tl-badge b-{{ {'misskey':'msk','mastodon':'mst','lastfm':'lfm','health':'hlth','photo':'hlth'}.get(e.source_type,'rss') }}">
+          {{ {'misskey':'🍣','mastodon':'🐘','lastfm':'🎵','health':'🍎','photo':'📷','rss':'🌐','weather':'☁️','github':'🐱','youtube':'▶️'}.get(e.source_type,'🌐') }}
+          {{ e.source_name }}
+        </span>
+        <div class="tl-content">
+          {% if e.metadata.get('cw') %}
+          <details><summary>{{ e.metadata.cw }}</summary><div class="tl-text">{{ e.content }}</div></details>
+          {% else %}
+          <div class="tl-text">{{ e.content }}</div>
+          {% endif %}
+          {% if e.url %}<a href="{{ e.url }}" target="_blank" rel="noopener" style="color:var(--color-text-info);font-size:10px"> ↗</a>{% endif %}
+          <div class="tl-time">{{ e.timestamp }}</div>
+        </div>
+      </div>
       {% else %}
-      {{ e.content }}
-      {% endif %}
-      {% if e.url %}
-      <a href="{{ e.url }}" target="_blank" rel="noopener" class="text-[#58a6ff] hover:underline text-xs ml-2">↗</a>
-      {% endif %}
+      <div style="padding:16px 0;font-size:13px;color:var(--color-text-tertiary)">該当なし</div>
+      {% endfor %}
     </div>
-    <span class="source-badge source-{{ e.source_type }} shrink-0">{{ e.source_type }}</span>
   </div>
-  {% else %}
-  <p class="text-[#8b949e] text-sm py-6 text-center">該当なし</p>
-  {% endfor %}
+  {% endif %}
 </div>
-{% endif %}
 {% endblock %}
