@@ -1,6 +1,6 @@
 # 現在の実装状況
 
-**最終更新**: 2026-03-23（Phase 5 実装中）
+**最終更新**: 2026-03-24（Phase 5 実装中）
 
 ---
 
@@ -82,6 +82,8 @@
 - [x] iPhoneショートカット 2（写真メタデータ）実機で動作確認済み
   - タイムスタンプ・位置情報（住所）・枚数を保存
 - [x] docs/iphone_shortcuts.md 作成・実際の動作に合わせて更新済み
+- [x] タイムスタンプを実際の受信時刻（`datetime.now(utc)`）に変更（固定 23:00/23:05 廃止）
+  - 再送時は同一 date の upsert で値・タイムスタンプを最新に上書き
 
 #### 実装上の注意点
 
@@ -105,8 +107,8 @@
   - `/summaries` — サマリー一覧
   - `/stats` — 統計
   - `/sources` — ソース管理（有効/無効トグル）
-  - `/api/timeline` — タイムライン JSON API（day/week/month/year）
-  - `/api/stats` — 統計 JSON API（投稿数・再生数・歩数・天気）
+  - `/api/timeline` — タイムライン JSON API（day/week/month/year）、新着順（DESC）
+  - `/api/stats` — 統計 JSON API（period=day/week/month/year 対応・集計）
   - `/api/ingest`・`/api/health` — iPhone ingest（Phase 4 Blueprint）
 - [x] `dashboard/static/css/dashboard.css`（CSS変数ベース・ライト/ダーク自動切替）
 - [x] `dashboard/static/js/calendar.js`（カレンダーロジック全体・フィルター・タイムライン描画）
@@ -119,12 +121,59 @@
 - [x] `planet-dashboard.service` systemd 登録・自動起動設定済み
 - [x] `planet-ingest.service` 廃止（dashboard に統合）
 
+#### ダッシュボード機能詳細（実装済み）
+
+**カレンダー・ナビゲーション**
+- [x] 月カレンダーグリッド + ヒートマップ（投稿数を色で表示）
+- [x] 週番号ボタンクリックで週ビュー選択
+- [x] view-tabs `[‹][日][週][月][年][›]` — ‹/› で前後の日/週/月/年に移動
+- [x] view-tabs ↔ カレンダー選択の双方向連動
+- [x] 今日ボタン
+
+**タイムライン**
+- [x] 新着順表示（最新が上）
+- [x] ソースバッジ（favicon 画像 + 絵文字フォールバック）
+- [x] バッジクリック → ソロフィルタリング（もう一度でリセット）
+- [x] CW（コンテンツ警告）折りたたみ
+- [x] ブースト/リノート表示
+- [x] 外部リンク（↗）
+- [x] メディア添付表示（画像サムネイル・動画プレイボタン）
+  - 旧データ（URL未保存）は 📎 アイコン表示
+
+**フィルターバー**
+- [x] 折りたたみ式（デフォルト折りたたみ）
+- [x] `[フィルター N/N ▾][すべて] | [📷 メディア]` — 常時表示
+- [x] 展開時にソース別ボタン一覧（favicon + 短縮名）
+- [x] 絞り込み中はトグルボタンをハイライト（`3/14` 表示）
+- [x] メディアフィルター（画像・動画添付投稿のみ表示）
+
+**統計カード**
+- [x] 日ビュー: 投稿数・再生数・歩数・天気（その日の値）
+- [x] 週/月/年ビュー: 各値の合計・天気は平均気温＋min–max 表示
+
+**favicon**
+- [x] lastfm・github・youtube: 既知 URL から直接取得
+- [x] misskey/mastodon: `base_url/favicon.ico`
+- [x] 廃止サーバー（is_active=False）: 絵文字フォールバック
+- [x] 1×1px トラッキングピクセル自動フォールバック
+
+**メディア添付収集**
+- [x] `collectors/misskey.py`・`collectors/mastodon.py`: `metadata["media"]` に URL・type・サムネイル保存
+- [x] `importers/misskey_json.py`: ActivityPub attachment を metadata に保存
+- [x] `db/backfill_media.py`: 既存データの media URL バックフィルスクリプト
+  - 廃止サーバー分は is_active=False で自動クリア
+
+**iPhone ingest（改善済み）**
+- [x] ヘルス・写真データのタイムスタンプを「実際の受信時刻」に変更（固定 23:00 → now()）
+  - オートメーションの実行確認が可能になった
+
 #### 残タスク（Phase 5）
 
 - [ ] デザイン・UI の細部調整（mockup/calender_v3.html との差分修正）
 - [ ] 検索: LIKE → pg_bigm 全文検索に切り替え
-- [ ] カレンダー: 週/月/年ビューの詳細実装（サマリー表示・集計など）
+- [ ] カレンダー: 週/月/年ビューにサマリー表示（summaries テーブルから取得）
 - [ ] サマリー: 公開トグル（is_published の更新 API）
+- [ ] ソース管理: 新規追加フォーム
 
 ---
 
@@ -137,11 +186,12 @@
 
 ## 既知の問題・注意事項
 
-- pon.icuは閉鎖済み個人インスタンス。インポート専用でdata_sourcesには登録しない
+- pon.icu / groundpolis.app は閉鎖済み個人インスタンス。is_active=False、favicon は絵文字フォールバック
 - 過去JSONはMisskey・Mastodon両方とも同一構造（announce/type: Noteの混在）
 - ブーストをインポートするかは settings.toml の include_boosts で制御
 - YouTube収集スクリプトは後回し（APIキー未取得）
 - mastodon.cloud @objtus の収集が不調（原因未調査）
+- `db/backfill_media.py` で既存 Misskey 投稿の media URL をバックフィル済み（206件更新・削除済み投稿は has_files=FALSE にクリア）
 
 ---
 
@@ -186,6 +236,8 @@ planet/
 │       ├── stats.html
 │       ├── sources.html
 │       └── timeline.html
+├── db/
+│   └── backfill_media.py       # 既存 Misskey 投稿の media URL バックフィルスクリプト
 ├── mockup/
 │   └── calender_v3.html        # UI デザインモックアップ
 ├── docs/

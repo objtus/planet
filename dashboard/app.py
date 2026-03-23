@@ -219,22 +219,54 @@ def create_app():
     # ------------------------------------------------------------------ #
     @app.route("/api/stats")
     def api_stats():
+        period   = request.args.get("period", "day")
         date_arg = request.args.get("date", str(datetime.now(JST).date()))
 
         conn = get_db_conn()
         cur  = conn.cursor()
         try:
-            # ソース種別ごとの投稿数
-            cur.execute("""
+            jst = "AT TIME ZONE 'Asia/Tokyo'"
+
+            # ---- 期間に応じた WHERE 句を生成 -------------------------
+            if period == "day":
+                log_where  = f"DATE(l.timestamp {jst}) = %s"
+                log_params = (date_arg,)
+                hd_where   = "date = %s"
+                hd_params  = (date_arg,)
+
+            elif period == "week":
+                yr, wk    = date_arg.split("-W")
+                log_where  = (f"EXTRACT(isoyear FROM l.timestamp {jst}) = %s "
+                              f"AND EXTRACT(week FROM l.timestamp {jst}) = %s")
+                log_params = (int(yr), int(wk))
+                hd_where   = ("EXTRACT(isoyear FROM date) = %s "
+                              "AND EXTRACT(week FROM date) = %s")
+                hd_params  = (int(yr), int(wk))
+
+            elif period == "month":
+                log_where  = f"TO_CHAR(l.timestamp {jst}, 'YYYY-MM') = %s"
+                log_params = (date_arg,)
+                hd_where   = "TO_CHAR(date, 'YYYY-MM') = %s"
+                hd_params  = (date_arg,)
+
+            elif period == "year":
+                log_where  = f"EXTRACT(year FROM l.timestamp {jst}) = %s"
+                log_params = (int(date_arg),)
+                hd_where   = "EXTRACT(year FROM date) = %s"
+                hd_params  = (int(date_arg),)
+
+            else:
+                return jsonify({"error": "invalid period"}), 400
+
+            # ---- 投稿数集計 ------------------------------------------
+            cur.execute(f"""
                 SELECT ds.type, COUNT(*)
                   FROM logs l
                   JOIN data_sources ds ON l.source_id = ds.id
-                 WHERE l.is_deleted = FALSE
-                   AND DATE(l.timestamp AT TIME ZONE 'Asia/Tokyo') = %s
+                 WHERE l.is_deleted = FALSE AND {log_where}
                  GROUP BY ds.type
-            """, (date_arg,))
-            by_type = dict(cur.fetchall())
-
+            """, log_params)
+            by_type      = dict(cur.fetchall())
             misskey_cnt  = by_type.get("misskey",  0)
             mastodon_cnt = by_type.get("mastodon", 0)
             play_cnt     = by_type.get("lastfm",   0)
@@ -242,30 +274,61 @@ def create_app():
                          + by_type.get("rss", 0) + by_type.get("youtube", 0)
             breakdown    = f"Misskey {misskey_cnt} / Mastodon {mastodon_cnt}"
 
-            # ヘルスデータ
-            cur.execute("""
-                SELECT steps, active_calories, heart_rate_avg
-                  FROM health_daily WHERE date = %s
-            """, (date_arg,))
-            health = cur.fetchone()
+            # ---- ヘルスデータ ----------------------------------------
+            if period == "day":
+                cur.execute(
+                    "SELECT steps, active_calories, heart_rate_avg FROM health_daily WHERE " + hd_where,
+                    hd_params,
+                )
+                health = cur.fetchone()
+                steps  = health[0] if health else None
+            else:
+                cur.execute(
+                    "SELECT SUM(steps) FROM health_daily WHERE " + hd_where,
+                    hd_params,
+                )
+                row   = cur.fetchone()
+                steps = int(row[0]) if row and row[0] else None
 
-            # 天気
-            cur.execute("""
-                SELECT temp_max, weather_desc, location
-                  FROM weather_daily WHERE date = %s
-            """, (date_arg,))
-            weather = cur.fetchone()
+            # ---- 天気 ------------------------------------------------
+            if period == "day":
+                cur.execute(
+                    "SELECT temp_max, weather_desc, location FROM weather_daily WHERE " + hd_where,
+                    hd_params,
+                )
+                w = cur.fetchone()
+                weather_obj = {
+                    "desc":     w[1] if w else None,
+                    "temp":     float(w[0]) if w and w[0] else None,
+                    "location": w[2] if w else None,
+                } if w else None
+            else:
+                cur.execute(
+                    """SELECT ROUND(AVG(temp_avg)::numeric, 1),
+                              MIN(temp_min),
+                              MAX(temp_max),
+                              MAX(location)
+                         FROM weather_daily WHERE """ + hd_where,
+                    hd_params,
+                )
+                w = cur.fetchone()
+                if w and w[0] is not None:
+                    weather_obj = {
+                        "avg_temp": float(w[0]),
+                        "min_temp": float(w[1]) if w[1] else None,
+                        "max_temp": float(w[2]) if w[2] else None,
+                        "location": w[3],
+                    }
+                else:
+                    weather_obj = None
 
             return jsonify({
+                "period":           period,
                 "posts":            post_cnt,
                 "posts_breakdown":  breakdown,
                 "plays":            play_cnt,
-                "steps":            health[0] if health else None,
-                "weather": {
-                    "desc":     weather[1] if weather else None,
-                    "temp":     float(weather[0]) if weather and weather[0] else None,
-                    "location": weather[2] if weather else None,
-                } if weather else None,
+                "steps":            steps,
+                "weather":          weather_obj,
             })
         finally:
             cur.close(); conn.close()

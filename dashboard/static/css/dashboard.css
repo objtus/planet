@@ -340,16 +340,50 @@ select {
 
 .filter-bar {
   display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+/* ヘッダー行: [フィルター N/N ▾][すべて]|[📷 メディア] */
+.filter-header {
+  display: flex;
   align-items: center;
   gap: 5px;
-  margin-bottom: 10px;
   flex-wrap: wrap;
 }
-.filter-label {
+
+/* トグルボタン */
+.filter-toggle-btn {
   font-size: 11px;
+  padding: 3px 9px;
+  border-radius: 20px;
+  border: 0.5px solid var(--color-border-tertiary);
+  cursor: pointer;
   color: var(--color-text-secondary);
-  margin-right: 2px;
-  flex-shrink: 0;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.filter-toggle-btn:hover { background: var(--color-background-secondary); }
+.filter-toggle-btn.filtering {
+  background: var(--color-background-info);
+  color: var(--color-text-info);
+  border-color: var(--color-border-info);
+  border-width: 1px;
+}
+#filter-count { font-variant-numeric: tabular-nums; }
+
+/* ソース一覧行（展開時） */
+.filter-source-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 6px 8px;
+  background: var(--color-background-secondary);
+  border-radius: var(--border-radius-md);
+  border: 0.5px solid var(--color-border-tertiary);
 }
 
 .filter-all {
@@ -441,7 +475,12 @@ select {
   margin-top: 1px;
   line-height: 1.5;
   flex-shrink: 0;
+  cursor: pointer;
+  border: none;
+  transition: filter 0.1s, transform 0.08s;
 }
+.tl-badge:hover  { filter: brightness(0.92); }
+.tl-badge:active { transform: scale(0.95); }
 .tl-badge img {
   display: block;
   width: 14px; height: 14px;

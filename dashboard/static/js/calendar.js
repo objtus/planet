@@ -404,7 +404,11 @@ async function loadWeek(year, week) {
   clearStats();
   const weekStr = `${year}-W${String(week).padStart(2, '0')}`;
   try {
-    const tl = await fetchJSON(`/api/timeline?period=week&date=${weekStr}`);
+    const [tl, stats] = await Promise.all([
+      fetchJSON(`/api/timeline?period=week&date=${weekStr}`),
+      fetchJSON(`/api/stats?period=week&date=${weekStr}`),
+    ]);
+    renderStats(stats);
     renderTimeline(tl.entries, 'week');
   } catch (e) {
     showTimelineError(e.message);
@@ -416,7 +420,11 @@ async function loadMonth() {
   clearStats();
   const monthStr = `${cur.year}-${String(cur.month + 1).padStart(2, '0')}`;
   try {
-    const tl = await fetchJSON(`/api/timeline?period=month&date=${monthStr}`);
+    const [tl, stats] = await Promise.all([
+      fetchJSON(`/api/timeline?period=month&date=${monthStr}`),
+      fetchJSON(`/api/stats?period=month&date=${monthStr}`),
+    ]);
+    renderStats(stats);
     renderTimeline(tl.entries, 'month');
   } catch (e) {
     showTimelineError(e.message);
@@ -427,7 +435,11 @@ async function loadYear() {
   showTimelineLoading();
   clearStats();
   try {
-    const tl = await fetchJSON(`/api/timeline?period=year&date=${cur.year}`);
+    const [tl, stats] = await Promise.all([
+      fetchJSON(`/api/timeline?period=year&date=${cur.year}`),
+      fetchJSON(`/api/stats?period=year&date=${cur.year}`),
+    ]);
+    renderStats(stats);
     renderTimeline(tl.entries, 'year');
   } catch (e) {
     showTimelineError(e.message);
@@ -448,26 +460,39 @@ function clearStats() {
 }
 
 function renderStats(s) {
+  const period = s.period ?? 'day';
+  const suffix = { day: '', week: '合計', month: '合計', year: '合計' }[period] ?? '';
+
   const set = (id, val, sub) => {
     const el = document.getElementById(id);
     if (!el) return;
     el.querySelector('.stat-val').textContent = val ?? '—';
     el.querySelector('.stat-src').textContent = sub ?? '';
   };
+
   set('stat-posts',
     s.posts != null ? s.posts.toLocaleString() : '—',
-    s.posts_breakdown ?? '');
+    suffix ? `${suffix}  ${s.posts_breakdown ?? ''}` : (s.posts_breakdown ?? ''));
+
   set('stat-plays',
     s.plays != null ? s.plays.toLocaleString() : '—',
-    'Last.fm');
+    suffix ? `Last.fm ${suffix}` : 'Last.fm');
+
   set('stat-steps',
     s.steps != null ? s.steps.toLocaleString() : '—',
-    'Apple Watch');
-  if (s.weather) {
+    suffix ? `Apple Watch ${suffix}` : 'Apple Watch');
+
+  if (period === 'day' && s.weather) {
     const desc = s.weather.desc ?? '';
     const temp = s.weather.temp != null ? `${s.weather.temp}°` : '';
     set('stat-weather', [desc, temp].filter(Boolean).join(' ') || '—',
       s.weather.location ?? '');
+  } else if (period !== 'day' && s.weather) {
+    // 週・月・年: 平均気温 + min–max
+    const avg  = s.weather.avg_temp != null ? `平均 ${s.weather.avg_temp}°` : '—';
+    const minT = s.weather.min_temp != null ? `${Math.round(s.weather.min_temp)}°` : '?';
+    const maxT = s.weather.max_temp != null ? `${Math.round(s.weather.max_temp)}°` : '?';
+    set('stat-weather', avg, `${minT} – ${maxT}  ${s.weather.location ?? ''}`);
   } else {
     set('stat-weather', '—', '');
   }
@@ -502,9 +527,36 @@ function faviconImgHTML(faviconUrl, emoji, extraCls) {
 
 function badgeHTML(source) {
   if (!source) return '<span class="tl-badge b-rss"><span class="bicon">🌐</span>?</span>';
-  const cls = `b-${source.cls}`;
+  const cls  = `b-${source.cls}`;
   const icon = faviconImgHTML(source.favicon_url, source.emoji);
-  return `<span class="tl-badge ${cls}">${icon}${esc(source.short_name)}</span>`;
+  return `<button class="tl-badge ${cls}" onclick="soloSource(${source.id})" title="${esc(source.name)}のみ表示（もう一度で解除）">${icon}${esc(source.short_name)}</button>`;
+}
+
+/**
+ * バッジクリック: そのソースだけ表示する（ソロ）。
+ * すでにそのソースのみ表示中ならすべて解除する（トグル）。
+ */
+function soloSource(id) {
+  const activeSources = SOURCES.filter(s => s.is_active !== false);
+  const onlyThis = activeSources.every(s => s.id === id ? activeIds.has(s.id) : !activeIds.has(s.id));
+
+  if (onlyThis) {
+    // すでにソロ状態 → すべて解除（filterAll）
+    activeSources.forEach(s => activeIds.add(s.id));
+  } else {
+    // ソロにする
+    activeSources.forEach(s => {
+      if (s.id === id) activeIds.add(s.id);
+      else             activeIds.delete(s.id);
+    });
+  }
+
+  // フィルターバーのボタンを同期
+  document.querySelectorAll('.ftag[data-src]').forEach(btn => {
+    btn.classList.toggle('on', activeIds.has(parseInt(btn.dataset.src)));
+  });
+
+  applyFilter();
 }
 
 function esc(s) {
@@ -597,6 +649,8 @@ function showTimelineError(msg) {
 // フィルター
 // =========================================================
 
+let filterBarOpen = false;  // ソース一覧の展開状態
+
 function toggleFilter(btn) {
   const id = parseInt(btn.dataset.src);
   if (activeIds.has(id)) activeIds.delete(id);
@@ -606,16 +660,29 @@ function toggleFilter(btn) {
 }
 
 function filterAll() {
-  SOURCES.forEach(s => activeIds.add(s.id));
-  document.querySelectorAll('.ftag').forEach(b => b.classList.add('on'));
+  SOURCES.filter(s => s.is_active !== false).forEach(s => activeIds.add(s.id));
+  document.querySelectorAll('.ftag[data-src]').forEach(b => b.classList.add('on'));
   applyFilter();
+}
+
+/** フィルター集計バッジを更新 */
+function updateFilterCount() {
+  const el     = document.getElementById('filter-count');
+  if (!el) return;
+  const activeSources = SOURCES.filter(s => s.is_active !== false);
+  const on  = activeSources.filter(s => activeIds.has(s.id)).length;
+  const tot = activeSources.length;
+  el.textContent = on === tot ? `全${tot}` : `${on}/${tot}`;
+  // 絞り込み中はトグルボタンをハイライト
+  const toggle = document.getElementById('filter-toggle');
+  if (toggle) toggle.classList.toggle('filtering', on < tot || mediaFilter);
 }
 
 function applyFilter() {
   let visible = 0;
   document.querySelectorAll('#timeline .tl-item').forEach(item => {
-    const id        = parseInt(item.dataset.src);
-    const srcMatch  = activeIds.has(id);
+    const id         = parseInt(item.dataset.src);
+    const srcMatch   = activeIds.has(id);
     const mediaMatch = !mediaFilter || item.dataset.media === '1';
     const show = srcMatch && mediaMatch;
     item.classList.toggle('hidden', !show);
@@ -625,14 +692,23 @@ function applyFilter() {
   document.getElementById('no-items').style.display =
     (visible === 0 && total > 0) ? 'block' : 'none';
 
-  // メディアフィルターボタンの見た目を同期
   const mediaBtn = document.getElementById('media-filter-btn');
   if (mediaBtn) mediaBtn.classList.toggle('on', mediaFilter);
+  updateFilterCount();
 }
 
 function toggleMediaFilter() {
   mediaFilter = !mediaFilter;
   applyFilter();
+}
+
+/** ソース一覧行の展開/折りたたみ */
+function toggleFilterBar() {
+  filterBarOpen = !filterBarOpen;
+  const row    = document.getElementById('filter-source-row');
+  const arrow  = document.getElementById('filter-arrow');
+  if (row)   row.style.display   = filterBarOpen ? 'flex' : 'none';
+  if (arrow) arrow.textContent   = filterBarOpen ? '▴' : '▾';
 }
 
 // =========================================================
@@ -643,26 +719,49 @@ function buildFilterBar() {
   const bar = document.getElementById('filter-bar');
   if (!bar) return;
 
+  // ---- ヘッダー行 ----------------------------------------
+  const header = document.createElement('div');
+  header.className = 'filter-header';
+
+  // トグルボタン
+  const toggle = document.createElement('button');
+  toggle.id        = 'filter-toggle';
+  toggle.className = 'filter-toggle-btn';
+  toggle.title     = 'ソースフィルターを展開/折りたたむ';
+  toggle.onclick   = toggleFilterBar;
+  toggle.innerHTML = 'フィルター <span id="filter-count">全0</span>'
+                   + ' <span id="filter-arrow">▾</span>';
+  header.appendChild(toggle);
+
+  // すべて解除
   const allBtn = document.createElement('button');
   allBtn.className   = 'filter-all';
   allBtn.textContent = 'すべて';
   allBtn.onclick     = filterAll;
-  bar.appendChild(allBtn);
+  header.appendChild(allBtn);
 
-  // メディアフィルターボタン（セパレーター扱い）
+  // セパレーター
   const sep = document.createElement('span');
   sep.className = 'filter-sep';
-  bar.appendChild(sep);
+  header.appendChild(sep);
 
+  // メディアフィルター
   const mediaBtn = document.createElement('button');
   mediaBtn.id        = 'media-filter-btn';
   mediaBtn.className = 'ftag f-rss';
   mediaBtn.title     = '画像・動画が添付された投稿のみ表示';
   mediaBtn.onclick   = toggleMediaFilter;
   mediaBtn.innerHTML = '<span class="ficon">📷</span>メディア';
-  bar.appendChild(mediaBtn);
+  header.appendChild(mediaBtn);
 
-  // アクティブなソースのみフィルターバーに表示
+  bar.appendChild(header);
+
+  // ---- ソース一覧行（デフォルト折りたたみ）--------------
+  const sourceRow = document.createElement('div');
+  sourceRow.id        = 'filter-source-row';
+  sourceRow.className = 'filter-source-row';
+  sourceRow.style.display = 'none';
+
   SOURCES.filter(s => s.is_active !== false).forEach(s => {
     const btn       = document.createElement('button');
     btn.className   = `ftag f-${s.cls} on`;
@@ -671,18 +770,16 @@ function buildFilterBar() {
     btn.onclick     = () => toggleFilter(btn);
 
     if (s.favicon_url) {
-      const img  = document.createElement('img');
-      img.src    = s.favicon_url;
-      img.alt    = '';
+      const img   = document.createElement('img');
+      img.src     = s.favicon_url;
+      img.alt     = '';
       img.loading = 'lazy';
       img.addEventListener('load',  () => window.onFaviconLoad(img));
       img.addEventListener('error', () => window.onFaviconError(img));
-
       const emojiSpan       = document.createElement('span');
       emojiSpan.className   = 'ficon';
       emojiSpan.textContent = s.emoji;
       emojiSpan.style.display = 'none';
-
       btn.appendChild(img);
       btn.appendChild(emojiSpan);
     } else {
@@ -693,8 +790,13 @@ function buildFilterBar() {
     }
 
     btn.appendChild(document.createTextNode(s.short_name));
-    bar.appendChild(btn);
+    sourceRow.appendChild(btn);
   });
+
+  bar.appendChild(sourceRow);
+
+  // 初期カウント表示
+  updateFilterCount();
 }
 
 // =========================================================

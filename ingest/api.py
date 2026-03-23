@@ -52,9 +52,8 @@ def _upsert_health(cur, data: dict) -> dict:
     if stand_hours     is not None: parts.append(f"スタンド: {stand_hours}時間")
     content = " / ".join(parts)
 
-    # timestamp: その日の JST 23:00 を UTC に変換
-    jst = timezone(timedelta(hours=9))
-    ts = datetime.strptime(date_str, "%Y-%m-%d").replace(hour=23, minute=0, tzinfo=jst)
+    # timestamp: 実際の受信時刻（UTC）を使用
+    ts = datetime.now(timezone.utc)
 
     # logs upsert (同じ日付のエントリがあれば上書き)
     cur.execute(
@@ -105,8 +104,7 @@ def _upsert_photos(cur, data: dict) -> dict:
     if "date" in data and "count" in data:
         date_str = data["date"]
         count = int(data["count"])
-        jst = timezone(timedelta(hours=9))
-        ts = datetime.strptime(date_str, "%Y-%m-%d").replace(hour=23, minute=5, tzinfo=jst)
+        ts = datetime.now(timezone.utc)
 
         # photos_json が文字列で渡された場合はパースして位置情報を取り出す
         photo_locations = None
