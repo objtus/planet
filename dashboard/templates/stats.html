@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}統計 — Planet{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<h1 class="text-lg font-semibold text-white mb-5">統計</h1>
+
+<!-- ソース別件数 -->
+<div class="bg-[#161b22] border border-[#21262d] rounded-lg p-4 mb-5">
+  <h2 class="text-white text-sm font-semibold mb-3">ソース別累計</h2>
+  <div class="flex flex-col gap-2">
+    {% set max_cnt = source_counts[0][2] if source_counts else 1 %}
+    {% for row in source_counts %}
+    <div class="flex items-center gap-3">
+      <span class="source-badge source-{{ row[1] }} w-16 text-center shrink-0">{{ row[1] }}</span>
+      <span class="text-[#e6edf3] text-xs w-48 truncate shrink-0">{{ row[0] }}</span>
+      <div class="flex-1 bg-[#21262d] rounded-full h-2 overflow-hidden">
+        <div class="h-2 rounded-full bg-[#238636]"
+             style="width: {{ (row[2] / max_cnt * 100) | round(1) }}%"></div>
+      </div>
+      <span class="text-[#8b949e] font-mono text-xs w-12 text-right shrink-0">{{ "{:,}".format(row[2]) }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- 月別投稿数グラフ -->
+<div class="bg-[#161b22] border border-[#21262d] rounded-lg p-4">
+  <h2 class="text-white text-sm font-semibold mb-3">月別投稿数（直近12ヶ月）</h2>
+  <canvas id="monthlyChart" height="80"></canvas>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const monthlyRaw = {{ monthly_raw | tojson }};
+
+// 月リスト収集
+const months = [...new Set(monthlyRaw.map(r => r[0]))].sort();
+const types  = [...new Set(monthlyRaw.map(r => r[1]))];
+
+const typeColors = {
+  misskey:  '#a37bff', mastodon: '#6364ff', lastfm:  '#d51002',
+  health:   '#3fb950', photo:    '#f0883e', weather: '#58a6ff',
+  github:   '#8b949e', rss:      '#ffa640', youtube: '#ff0000',
+};
+
+const datasets = types.map(type => {
+  const dataMap = {};
+  monthlyRaw.filter(r => r[1] === type).forEach(r => { dataMap[r[0]] = r[2]; });
+  return {
+    label: type,
+    data: months.map(m => dataMap[m] || 0),
+    backgroundColor: (typeColors[type] || '#8b949e') + '99',
+    borderColor:     typeColors[type] || '#8b949e',
+    borderWidth: 1,
+    stack: 'main',
+  };
+});
+
+new Chart(document.getElementById('monthlyChart'), {
+  type: 'bar',
+  data: { labels: months, datasets },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: { labels: { color: '#8b949e', boxWidth: 12, font: { size: 11 } } },
+    },
+    scales: {
+      x: { stacked: true, ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' } },
+      y: { stacked: true, ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' } },
+    },
+  }
+});
+</script>
+{% endblock %}

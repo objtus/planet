@@ -1,0 +1,13 @@
+[Unit]
+Description=Planet Dashboard
+After=network.target postgresql.service
+
+[Service]
+User=objtus
+WorkingDirectory=/home/objtus/planet
+ExecStart=/home/objtus/planet/venv/bin/python dashboard/app.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}サマリー — Planet{% endblock %}
+
+{% block content %}
+<h1 class="text-lg font-semibold text-white mb-4">サマリー一覧</h1>
+
+{% if items %}
+<div class="flex flex-col gap-4">
+  {% for item in items %}
+  <div class="bg-[#161b22] border border-[#21262d] rounded-lg p-4">
+    <div class="flex items-center justify-between mb-2">
+      <div class="flex items-center gap-2">
+        <span class="text-white font-semibold text-sm">
+          {% if item.period_type == 'weekly' %}
+            {{ item.period_start }} 週 (CW{{ item.week_number }})
+          {% else %}
+            {{ item.period_start[:7] }} 月次
+          {% endif %}
+        </span>
+        <span class="text-[10px] px-2 py-0.5 rounded-full
+          {% if item.period_type == 'weekly' %}bg-[#58a6ff22] text-[#79c0ff] border border-[#58a6ff44]
+          {% else %}bg-[#3fb95022] text-[#58d668] border border-[#3fb95044]{% endif %}">
+          {{ item.period_type }}
+        </span>
+        {% if item.is_published %}
+        <span class="text-[10px] px-2 py-0.5 rounded-full bg-[#238636] text-white">公開済</span>
+        {% endif %}
+      </div>
+      <span class="text-[#8b949e] text-xs">{{ item.created_at }}</span>
+    </div>
+    <pre class="text-[#e6edf3] text-sm whitespace-pre-wrap font-sans leading-relaxed">{{ item.content }}</pre>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="bg-[#161b22] border border-[#21262d] rounded-lg p-8 text-center">
+  <p class="text-[#8b949e] text-sm">サマリーはまだありません</p>
+  <p class="text-[#8b949e] text-xs mt-1">Phase 6 で Ollama によるサマリー生成を実装します</p>
+</div>
+{% endif %}
+{% endblock %}

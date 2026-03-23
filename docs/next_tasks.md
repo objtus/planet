@@ -4,84 +4,76 @@
 
 ---
 
-## 直近でやること（Phase 1から開始）
+## 現在の状況
 
-### 1. Ubuntuの現状確認
-```bash
-python3 --version
-pip3 --version
-psql --version
-```
-
-### 2. PostgreSQLのインストールとセットアップ
-```bash
-sudo apt install postgresql postgresql-contrib
-sudo systemctl start postgresql
-sudo systemctl enable postgresql
-sudo -u postgres psql -c "CREATE USER planet WITH PASSWORD 'password';"
-sudo -u postgres psql -c "CREATE DATABASE planet OWNER planet;"
-```
-
-### 3. pg_bigm拡張の導入
-
-### 4. スキーマ作成
-docs/design.md Section 5 のSQLを実行
-
-### 5. data_sourcesへの初期データ投入
-
-### 6. Python仮想環境とパッケージインストール
-```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install flask psycopg2-binary requests feedparser \
-            beautifulsoup4 pylast tomllib python-dateutil
-```
-
-### 7. settings.toml作成
-config/settings.toml.example をコピーして編集
+- Phase 1（基盤構築）: **完了**
+- Phase 2（過去データインポート）: **完了**
+- Phase 3（自動収集）: **完了**
+- Phase 4（iPhone連携）: **完了**
+- Phase 5（ダッシュボード）: **未着手** ← 次はここ
+- Phase 6（AI生成・公開）: 未着手
+- Phase 7（自動化・バックアップ）: 未着手
 
 ---
 
-## Phase 2（インポート）で必要なもの
+## Phase 5: ダッシュボード
 
-- [ ] pon.icuのエクスポートJSONファイルのパス確認
-- [ ] mastodon.cloudのエクスポートJSONファイルのパス確認
-- [ ] groundpolis.appのエクスポートJSONファイルのパス確認（あれば）
-- インポート仕様は docs/importers.md 参照
+仕様は `docs/design.md` Section 6 参照。
 
----
+### 実装順序
 
-## APIキーの取得が必要なもの
+1. **Flask アプリ骨格**（`dashboard/app.py`）
+   - `ingest_bp`（`ingest/api.py`）を統合してポート5000で一本化
+   - `planet-ingest.service` は廃止
+2. **カレンダー画面**（`/`）
+   - ヒートマップカレンダー（GitHubスタイル、ISO週番号付き）
+   - 日/週/月/年の選択による表示切り替え
+3. **タイムライン表示**
+   - 全ソース統合、ソースアイコン付き
+   - CW付き投稿は折りたたみ
+4. **検索機能**（`/search`）
+   - pg_bigm 全文検索
+   - ソース・日付範囲フィルター
+5. **統計グラフ**（`/stats`）
+6. **サマリー一覧**（`/summaries`）
+7. **ソース管理画面**（`/sources`）
 
-### SNS系（認証あり・トークン取得が必要）
+### デザイン方針（`docs/design.md` より）
 
-**Misskey（各インスタンスで手動発行）**
-各インスタンスにログイン → 設定 → API → アクセストークンを発行
-権限: `read:account` のみ
-
-- [x] misskey.io @yuinoid
-- [x] misskey.io @vknsq（同じインスタンス、別トークン）
-- [x] tanoshii.site @health
-- [x] msk.ilnk.info @google
-- [x] sushi.ski @idoko
-
-**Mastodon（OAuth 2.0フロー）**
-手順は docs/api/mastodon.md 参照（アプリ登録→ブラウザ認証→トークン取得）
-
-- [x] mistodon.cloud @healthcare
-- [x] mastodon.cloud @objtus
-
-### その他APIキー
-
-- [x] Last.fm APIキー
-- [x] OpenWeatherMap APIキー
-- [x] GitHub Personal Access Token
-- [ ] YouTube Data API v3 キー（Google Cloud Console）※後回し
-- [x] Neocities APIキー
+- ダークテーマ・シンプル・クール・情報密度高め
+- モバイル（iPhone）対応レスポンシブ
+- Tailscale 経由のみアクセス（追加認証なし）
 
 ---
 
-## Claude Codeへの渡し方
+## Phase 6: AI生成・公開
+
+1. Ollama サマリー生成（`summarizer/generate.py`）
+2. プロンプトテンプレート（`summarizer/prompts/`）
+3. 過去分サマリー一括生成
+4. Neocities HTML テンプレート作成
+5. Neocities アップロードスクリプト（`publisher/`）
+
+---
+
+## Phase 7: 自動化・バックアップ
+
+1. 全 cron ジョブ統合・整理
+2. バックアップスクリプト（`backup/backup.sh`）
+   - `pg_dump → gzip → rclone → pCloud`
+   - 毎週日曜 AM 3:00
+3. エラーログ整備
+
+---
+
+## 残っている小タスク
+
+- [ ] YouTube Data API v3 キー取得（Google Cloud Console）→ `collectors/youtube.py` 有効化
+- [ ] mastodon.cloud @objtus の収集が不調 → 原因調査
+
+---
+
+## LLMへの渡し方
 
 起動時に以下を読ませる：
 1. docs/overview.md
@@ -90,6 +82,7 @@ config/settings.toml.example をコピーして編集
 
 詳細が必要なときに参照させる：
 - docs/design.md（スキーマ・全体仕様）
+- docs/iphone_shortcuts.md（iPhone連携の詳細）
 - docs/importers.md（インポーター実装時）
 - docs/api/misskey.md（Misskey収集スクリプト実装時）
 - docs/api/mastodon.md（Mastodon収集スクリプト実装時）

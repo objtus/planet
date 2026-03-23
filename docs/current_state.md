@@ -1,6 +1,6 @@
 # 現在の実装状況
 
-**最終更新**: 2026-03-23
+**最終更新**: 2026-03-23（Phase 5 着手）
 
 ---
 
@@ -64,10 +64,48 @@
 - [x] collect_all.py（一括実行スクリプト）
 - [x] cron登録済み（cron/crontab.txt）
 
+### Phase 4: iPhone連携（完了）
+
+- [x] ingest/api.py 作成（Flask Blueprint）
+  - `POST /api/ingest` — ヘルスデータ・写真メタデータを受け取り health_daily / logs に保存
+  - `GET /api/health` — 死活確認用エンドポイント
+  - `active_calories` の小数を整数に丸める処理
+  - `date` / `dates` どちらのキーでも受け付ける
+  - `photo_json` / `photos_json` どちらのキーでも受け付ける
+  - 位置情報の住所中の改行をスペース変換して JSON パース
+- [x] planet-ingest.service を systemd に登録・自動起動設定済み
+- [x] iPhoneショートカット 1（ヘルスデータ）実機で動作確認済み
+- [x] iPhoneショートカット 2（写真メタデータ）実機で動作確認済み
+  - タイムスタンプ・位置情報（住所）・枚数を保存
+- [x] docs/iphone_shortcuts.md 作成・実際の動作に合わせて更新済み
+
+#### 実装上の注意点
+
+- ヘルス: `ヘルスケアサンプルを検索` を使う（`ヘルスケアの数量を取得` には集計機能なし）
+- 心拍数の最大・最小: `ヘルスケアサンプルを検索` で値の降順/昇順ソート + 上限1件
+- 心拍数の平均の代わりに `安静時心拍数` サンプルを使用
+- 写真: ループ内で**辞書ではなくテキスト**を `変数に追加` するのがポイント（辞書を追加すると 0 件になる iOS Shortcuts の挙動）
+- `count` フィールドはダミー値 0 を送り、サーバー側で `photo_json` の要素数から実際の枚数を算出
+
+## 進行中
+
+### Phase 5: ダッシュボード（実装中）
+
+- [x] `dashboard/app.py` 作成（Flask骨格 + `ingest_bp` 統合）
+- [x] `dashboard/templates/base.html`（ダークテーマ・ナビ）
+- [x] `dashboard/templates/calendar.html`（ヒートマップ + タイムライン Ajax）
+- [x] `dashboard/templates/timeline.html`
+- [x] `dashboard/templates/search.html`
+- [x] `dashboard/templates/summaries.html`
+- [x] `dashboard/templates/stats.html`（Chart.js 月別グラフ・ソース別バー）
+- [x] `dashboard/templates/sources.html`（有効/無効トグル）
+- [x] `planet-dashboard.service` 作成（`planet-ingest.service` を統合・廃止）
+- [ ] pg_bigm 全文検索への切り替え（現在 LIKE 検索）
+- [ ] タイムライン：週/月/年表示の実装
+- [ ] サマリー公開トグル（is_published）
+
 ## 未着手
 
-- [ ] Phase 4: iPhone連携
-- [ ] Phase 5: ダッシュボード
 - [ ] Phase 6: AI生成・公開
 - [ ] Phase 7: 自動化・バックアップ
 

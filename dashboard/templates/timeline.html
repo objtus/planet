@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}タイムライン — Planet{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-4">
+  <h1 class="text-lg font-semibold text-white">タイムライン</h1>
+  <span class="text-[#8b949e] text-sm">{{ entries | length }} 件</span>
+</div>
+
+<div class="bg-[#161b22] border border-[#21262d] rounded-lg px-4">
+  {% for e in entries %}
+  <div class="flex gap-3 py-2.5 border-b border-[#21262d] last:border-0 items-start">
+    <span class="text-[#8b949e] font-mono text-xs w-32 shrink-0 pt-0.5">{{ e.timestamp_full }}</span>
+    <div class="flex-1 min-w-0 text-sm leading-relaxed">
+      {% if e.metadata.get('cw') %}
+      <details>
+        <summary class="cursor-pointer text-[#8b949e]">{{ e.metadata.cw }}</summary>
+        <p class="mt-1">{{ e.content }}</p>
+      </details>
+      {% else %}
+      <span>{{ e.content }}</span>
+      {% endif %}
+      {% if e.url %}
+      <a href="{{ e.url }}" target="_blank" rel="noopener" class="text-[#58a6ff] hover:underline text-xs ml-2">↗</a>
+      {% endif %}
+    </div>
+    <span class="source-badge source-{{ e.source_type }} shrink-0">{{ e.source_type }}</span>
+  </div>
+  {% else %}
+  <p class="text-[#8b949e] text-sm py-6 text-center">記録がありません</p>
+  {% endfor %}
+</div>
+{% endblock %}
