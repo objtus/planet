@@ -33,15 +33,15 @@
 
 ### UI・デザイン調整
 
-- [ ] `mockup/calender_v3.html` との差分を詰める（細部のスタイル修正）
-- [ ] モバイル（iPhone）レイアウト確認・調整
+- `mockup/calender_v3.html` との差分を詰める（細部のスタイル修正）
+- モバイル（iPhone）レイアウト確認・調整
 
 ### 機能追加
 
-- [ ] 検索: `LIKE` → `pg_bigm` 全文検索（`gin_bigm_ops` インデックス使用）
-- [ ] カレンダー: 週/月/年ビューにサマリー表示（`summaries` テーブルから取得）
-- [ ] サマリー: `is_published` 公開トグル API
-- [ ] ソース管理: 新規追加フォーム（種別選択 → フィールド切り替え）
+- 検索: `LIKE` → `pg_bigm` 全文検索（`gin_bigm_ops` インデックス使用）
+- カレンダー: 週/月/年ビューにサマリー表示（`summaries` テーブルから取得）
+- サマリー: `is_published` 公開トグル API
+- ソース管理: 新規追加フォーム（種別選択 → フィールド切り替え）
 
 ### 参考ドキュメント
 
@@ -65,27 +65,29 @@
 
 1. 全 cron ジョブ統合・整理
 2. バックアップスクリプト（`backup/backup.sh`）
-   - `pg_dump → gzip → rclone → pCloud`
-   - 毎週日曜 AM 3:00
+  - `pg_dump → gzip → rclone → pCloud`
+  - 毎週日曜 AM 3:00
 3. エラーログ整備
 
 ---
 
 ## 残っている小タスク
 
-- [ ] YouTube Data API v3 キー取得（Google Cloud Console）→ `collectors/youtube.py` 有効化
-- [ ] mastodon.cloud @objtus の収集が不調 → 原因調査
+- YouTube Data API v3 キー取得（Google Cloud Console）→ `collectors/youtube.py` 有効化
+- mastodon.cloud @objtus の収集が不調 → 原因調査
 
 ---
 
 ## LLMへの渡し方
 
 起動時に以下を読ませる：
+
 1. docs/overview.md
 2. docs/current_state.md
 3. docs/next_tasks.md
 
 詳細が必要なときに参照させる：
+
 - docs/design.md（スキーマ・全体仕様）
 - docs/dashboard_ui.md（ダッシュボード UI仕様・モックアップの説明）
 - docs/iphone_shortcuts.md（iPhone連携の詳細）
@@ -93,3 +95,4 @@
 - docs/api/misskey.md（Misskey収集スクリプト実装時）
 - docs/api/mastodon.md（Mastodon収集スクリプト実装時）
 - docs/api/*.md（各収集スクリプト実装時）
+
