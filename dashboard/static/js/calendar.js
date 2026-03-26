@@ -23,6 +23,9 @@ let cur = {
 let activeIds     = new Set(SOURCES.map(s => s.id));
 let mediaFilter   = false;  // true = メディアあり投稿のみ表示
 
+// タイムラインに実際に表示されている期間のタイトル（カレンダーナビと分離）
+let tlTitle = '';
+
 // =========================================================
 // ISO 週番号ユーティリティ
 // =========================================================
@@ -88,17 +91,33 @@ function buildCal() {
   const startDow = (first.getDay() + 6) % 7;  // 月曜=0
   const today    = new Date();
 
+  // 前月・翌月の年月
+  const prevLast  = new Date(cur.year, cur.month, 0);
+  const prevYear  = prevLast.getFullYear();
+  const prevMonth = prevLast.getMonth();
+  const nextYear  = cur.month === 11 ? cur.year + 1 : cur.year;
+  const nextMonth = cur.month === 11 ? 0 : cur.month + 1;
+
+  // セルを {d, y, m, other} の形式で構築（null を使わない）
   const cells = [];
-  for (let i = 0; i < startDow; i++) cells.push(null);
-  for (let d = 1; d <= last.getDate(); d++) cells.push(d);
-  while (cells.length % 7) cells.push(null);
+  for (let i = 0; i < startDow; i++) {
+    const d = prevLast.getDate() - startDow + 1 + i;
+    cells.push({ d, y: prevYear, m: prevMonth, other: true });
+  }
+  for (let d = 1; d <= last.getDate(); d++) {
+    cells.push({ d, y: cur.year, m: cur.month, other: false });
+  }
+  let nday = 1;
+  while (cells.length % 7) {
+    cells.push({ d: nday++, y: nextYear, m: nextMonth, other: true });
+  }
 
   for (let r = 0; r < cells.length / 7; r++) {
     const tr = document.createElement('tr');
 
-    // 週番号セル
-    const refDay = cells.slice(r * 7, r * 7 + 7).find(c => c !== null);
-    const { week: wn, year: wy } = isoWeek(new Date(cur.year, cur.month, refDay));
+    // 週番号セル（行の先頭セルの実際の日付から ISO 週を計算）
+    const firstCell = cells[r * 7];
+    const { week: wn, year: wy } = isoWeek(new Date(firstCell.y, firstCell.m, firstCell.d));
     const isSelWeek = cur.selWeek && cur.selWeek.week === wn && cur.selWeek.year === wy;
 
     const tdW   = document.createElement('td');
@@ -113,32 +132,74 @@ function buildCal() {
 
     // 7日分セル
     for (let c = 0; c < 7; c++) {
-      const d  = cells[r * 7 + c];
-      const td = document.createElement('td');
-      if (!d) {
-        td.innerHTML = '<div class="day empty"></div>';
-      } else {
-        const ds      = dateStr(cur.year, cur.month, d);
-        const count   = HEATMAP[ds] ?? 0;
-        const level   = heatLevel(count);
-        const isToday = d === today.getDate()
-                     && cur.month === today.getMonth()
-                     && cur.year  === today.getFullYear();
-        const isSel   = cur.viewMode === 'day' && d === cur.selDay;
+      const cell = cells[r * 7 + c];
+      const td   = document.createElement('td');
 
-        let cls = `day h${level}`;
-        if (isToday) cls += ' today';
-        if (isSel)   cls += ' selected';
+      const ds      = dateStr(cell.y, cell.m, cell.d);
+      const isToday = cell.d === today.getDate()
+                   && cell.m === today.getMonth()
+                   && cell.y === today.getFullYear();
+      // 選択状態は当月のみ（他月の同じ日番号を誤ってハイライトしない）
+      const isSel   = !cell.other && cur.viewMode === 'day' && cell.d === cur.selDay;
 
-        td.innerHTML = `<div class="${cls}" title="${ds}  ${count}件">${d}</div>`;
-        td.querySelector('.day').addEventListener('click', () => selectDay(d));
-      }
+      // ヒートマップは当月のみ表示（他月は常に h0 で無色）
+      const level = cell.other ? 0 : heatLevel(HEATMAP[ds] ?? 0);
+      const count = cell.other ? 0 : (HEATMAP[ds] ?? 0);
+
+      let cls = `day h${level}`;
+      if (cell.other) cls += ' other';
+      if (isToday)    cls += ' today';
+      if (isSel)      cls += ' selected';
+
+      const title = cell.other ? ds : `${ds}  ${count}件`;
+      td.innerHTML = `<div class="${cls}" title="${title}">${cell.d}</div>`;
+      td.querySelector('.day').addEventListener(
+        'click',
+        cell.other
+          ? () => selectOtherDay(cell.y, cell.m, cell.d)
+          : () => selectDay(cell.d),
+      );
       tr.appendChild(td);
     }
     body.appendChild(tr);
   }
 
   updateDetailTitle();
+  updateCalHeaderButtons();
+}
+
+/** カレンダーヘッダーの月・年ボタンのラベルを現在表示中の年月に合わせる */
+function updateCalHeaderButtons() {
+  const btnM = document.getElementById('btn-cal-month');
+  const btnY = document.getElementById('btn-cal-year');
+  if (btnM) btnM.textContent = `${cur.month + 1}月`;
+  if (btnY) btnY.textContent = `${cur.year}年`;
+}
+
+/**
+ * カレンダーヘッダーの「N月」ボタン用。
+ * setViewMode('month') は year→month 遷移時に cur.month=0（1月）にする
+ * 仕様があるため、カレンダー表示中の月をそのまま維持する専用関数を使う。
+ */
+function goCalMonth() {
+  cur.selDay   = null;
+  cur.selWeek  = null;
+  cur.viewMode = 'month';
+  setActiveTab('tab-month');
+  syncTabLabel();
+  buildCal();
+  loadMonth();
+}
+
+/** カレンダーヘッダーの「N年」ボタン用。 */
+function goCalYear() {
+  cur.selDay   = null;
+  cur.selWeek  = null;
+  cur.viewMode = 'year';
+  setActiveTab('tab-year');
+  syncTabLabel();
+  buildCal();
+  loadYear();
 }
 
 // =========================================================
@@ -148,6 +209,19 @@ function buildCal() {
 /** カレンダーの日付セルをクリック */
 function selectDay(d) {
   cur.selDay   = d;
+  cur.selWeek  = null;
+  cur.viewMode = 'day';
+  syncTabLabel();
+  setActiveTab('tab-day');
+  buildCal();
+  loadDay();
+}
+
+/** 他月の日付セルをクリック: カレンダーをその月に切り替えてから日選択 */
+function selectOtherDay(year, month, day) {
+  cur.year     = year;
+  cur.month    = month;
+  cur.selDay   = day;
   cur.selWeek  = null;
   cur.viewMode = 'day';
   syncTabLabel();
@@ -275,20 +349,17 @@ function syncTabLabel() {
     : '週';
 }
 
+/** タイムラインのタイトルを確定して保存し DOM に反映する */
+function setTlTitle(text) {
+  tlTitle = text;
+  const el = document.getElementById('detail-title');
+  if (el) el.textContent = text;
+}
+
+/** buildCal() から呼ばれる。カレンダーナビで cur が変化しても保存済みの値を復元するだけ */
 function updateDetailTitle() {
   const el = document.getElementById('detail-title');
-  if (!el) return;
-  if (cur.viewMode === 'day' && cur.selDay !== null) {
-    const d   = new Date(cur.year, cur.month, cur.selDay);
-    const dow = ['日','月','火','水','木','金','土'][d.getDay()];
-    el.textContent = `${cur.month + 1}月${cur.selDay}日（${dow}）`;
-  } else if (cur.viewMode === 'week' && cur.selWeek) {
-    el.textContent = `${cur.selWeek.year}年 第${cur.selWeek.week}週`;
-  } else if (cur.viewMode === 'month') {
-    el.textContent = `${cur.year}年${cur.month + 1}月`;
-  } else if (cur.viewMode === 'year') {
-    el.textContent = `${cur.year}年`;
-  }
+  if (el && tlTitle) el.textContent = tlTitle;
 }
 
 // =========================================================
@@ -385,6 +456,9 @@ function showTimelineLoading() {
 async function loadDay() {
   if (cur.selDay === null) return;
   const ds = dateStr(cur.year, cur.month, cur.selDay);
+  const _d  = new Date(cur.year, cur.month, cur.selDay);
+  const dow = ['日','月','火','水','木','金','土'][_d.getDay()];
+  setTlTitle(`${cur.month + 1}月${cur.selDay}日（${dow}）`);
   showTimelineLoading();
   clearStats();
   try {
@@ -400,6 +474,7 @@ async function loadDay() {
 }
 
 async function loadWeek(year, week) {
+  setTlTitle(`${year}年 第${week}週`);
   showTimelineLoading();
   clearStats();
   const weekStr = `${year}-W${String(week).padStart(2, '0')}`;
@@ -416,6 +491,7 @@ async function loadWeek(year, week) {
 }
 
 async function loadMonth() {
+  setTlTitle(`${cur.year}年${cur.month + 1}月`);
   showTimelineLoading();
   clearStats();
   const monthStr = `${cur.year}-${String(cur.month + 1).padStart(2, '0')}`;
@@ -432,6 +508,7 @@ async function loadMonth() {
 }
 
 async function loadYear() {
+  setTlTitle(`${cur.year}年`);
   showTimelineLoading();
   clearStats();
   try {

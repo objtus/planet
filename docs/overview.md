@@ -34,7 +34,7 @@ OllamaでAIサマリーを生成、Neocitiesの個人サイトに自動公開す
 - Last.fm: objtus
 - 個人サイト RSS: yuinoid.neocities.org/rss.xml
 - YouTube: 投稿動画（APIキー未取得・収集待ち）
-- OpenWeatherMap: 天気
+- OpenWeatherMap: 天気（取得地点は `config/settings.toml` で名古屋。過去分は Open-Meteo バックフィル可）
 - GitHub: 開発活動
 - iPhone: 歩数・カロリー・心拍数・運動/スタンド / 写真メタデータ
 
@@ -54,8 +54,11 @@ OllamaでAIサマリーを生成、Neocitiesの個人サイトに自動公開す
 
 - URL: `http://<tailscale-ip>:5000`（`planet-dashboard.service` で起動）
 - 画面: カレンダー / 検索 / サマリー / 統計 / ソース管理
-- 月カレンダー形式のヒートマップ（投稿数を青の濃淡で表現）
-- 日・週・月・年の切り替えによるタイムライン表示
+- 月カレンダー形式のヒートマップ（投稿数を青の濃淡で表現）。前後月の日付も薄く表示
+- 日・週・月・年の切り替えによるタイムライン表示。見出し日付は表示中タイムラインと一致（カレンダー月送りのみでは変わらない）
+- カレンダー右上から現在表示月・年のタイムラインへジャンプ可能
+- 画像ライトボックス、統計は月別/年別グラフ切替・Chart.js は静的ファイル配信
+- ソース管理: 表示順・略称・個別/一括の手動収集（`POST /api/collect/<stype>`）
 - ソースフィルター（アカウント単位でオン/オフ）
 - CSS変数ベース（ライトテーマ・ダークモード自動切替）
 - `ingest/api.py` を統合済み（iPhone ショートカットからも引き続き利用可能）
@@ -74,6 +77,7 @@ planet/
 │   ├── app.py
 │   ├── static/css/dashboard.css
 │   ├── static/js/calendar.js
+│   ├── static/js/chart.umd.min.js
 │   └── templates/
 ├── mockup/                  # UI デザインモックアップ
 ├── summarizer/              # Ollamaサマリー生成（未実装）

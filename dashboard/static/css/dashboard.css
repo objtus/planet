@@ -170,6 +170,31 @@ select {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 1rem;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cal-header-right {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+/* 月・年ジャンプボタン */
+.cal-view-btn {
+  font-size: 12px;
+  padding: 3px 9px;
+  border-radius: 20px;
+  border: 0.5px solid var(--color-border-tertiary);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+}
+.cal-view-btn:hover {
+  background: var(--color-background-info);
+  color: var(--color-text-info);
+  border-color: var(--color-border-info);
 }
 
 .date-nav { display: flex; align-items: center; gap: 4px; }
@@ -703,6 +728,130 @@ details[open] summary::before { content: "▼ "; }
 }
 .toggle-btn[data-active="true"]  .toggle-knob { left: 18px; }
 .toggle-btn[data-active="false"] .toggle-knob { left: 2px; }
+
+/* =========================================================
+   SOURCES — 順序ボタン・略称入力
+   ========================================================= */
+
+.move-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: center;
+}
+
+.move-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px; height: 20px;
+  font-size: 9px;
+  line-height: 1;
+  padding: 0;
+  border-radius: 4px;
+  color: var(--color-text-tertiary);
+  border: 0.5px solid var(--color-border-tertiary);
+  cursor: pointer;
+  transition: color 0.1s, background 0.1s;
+}
+.move-btn:hover:not(:disabled) {
+  color: var(--color-text-primary);
+  background: var(--color-background-secondary);
+}
+.move-btn:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
+/* 収集ボタン（行内） */
+.collect-btn {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: var(--border-radius-md);
+  border: 0.5px solid var(--color-border-tertiary);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+  min-width: 32px;
+}
+.collect-btn:hover:not(:disabled) {
+  background: var(--color-background-info);
+  color: var(--color-text-info);
+  border-color: var(--color-border-info);
+}
+.collect-btn:disabled { opacity: 0.5; cursor: default; }
+
+/* 全ソース収集ボタン */
+.collect-all-btn {
+  font-size: 12px;
+  padding: 6px 14px;
+  border-radius: var(--border-radius-md);
+  border: 0.5px solid var(--color-border-info);
+  background: var(--color-background-info);
+  color: var(--color-text-info);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-weight: 500;
+  transition: opacity 0.1s;
+}
+.collect-all-btn:hover:not(:disabled) { opacity: 0.8; }
+.collect-all-btn:disabled { opacity: 0.5; cursor: default; }
+
+/* 収集ログパネル */
+.collect-log {
+  margin-top: 10px;
+  background: var(--color-background-secondary);
+  border: 0.5px solid var(--color-border-tertiary);
+  border-radius: var(--border-radius-md);
+  overflow: hidden;
+}
+.collect-log-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  border-bottom: 0.5px solid var(--color-border-tertiary);
+}
+.collect-log pre {
+  font-size: 11px;
+  font-family: monospace;
+  color: var(--color-text-primary);
+  padding: 10px 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 200px;
+  overflow-y: auto;
+  margin: 0;
+}
+
+/* 略称インライン入力 */
+.sn-input {
+  width: 100%;
+  padding: 3px 7px;
+  font-size: 12px;
+  font-family: var(--font-sans);
+  color: var(--color-text-primary);
+  background: var(--color-background-secondary);
+  border: 1px solid transparent;
+  border-radius: 20px;
+  outline: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+.sn-input:focus {
+  border-color: var(--color-border-info);
+  background: var(--color-background-primary);
+}
+.sn-input::placeholder {
+  color: var(--color-text-tertiary);
+}
+.sn-input.sn-saved {
+  border-color: #5DCAA5;
+  background: #E1F5EE;
+  transition: none;
+}
 
 /* =========================================================
    SUMMARIES PAGE

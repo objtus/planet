@@ -1,6 +1,6 @@
 # 現在の実装状況
 
-**最終更新**: 2026-03-24（Phase 5 実装中）
+**最終更新**: 2026-03-26（Phase 5 実装中）
 
 ---
 
@@ -105,19 +105,23 @@
   - `/` — カレンダー画面
   - `/search` — 検索
   - `/summaries` — サマリー一覧
-  - `/stats` — 統計
-  - `/sources` — ソース管理（有効/無効トグル）
+  - `/stats` — 統計（月別・年別集計クエリ）
+  - `/sources` — ソース管理（有効/無効・並べ替え・略称・収集）
   - `/api/timeline` — タイムライン JSON API（day/week/month/year）、新着順（DESC）
   - `/api/stats` — 統計 JSON API（period=day/week/month/year 対応・集計）
   - `/api/ingest`・`/api/health` — iPhone ingest（Phase 4 Blueprint）
+  - `POST /sources/<id>/move` — `{"direction":"up"|"down"}` で `sort_order` 入れ替え
+  - `POST /sources/<id>/rename` — `{"short_name":"..."}` で略称更新
+  - `POST /api/collect/<stype>` — 収集スクリプトをサブプロセス実行（`stype` は種別名または `all`）。`PYTHONPATH` にリポジトリルートを付与
 - [x] `dashboard/static/css/dashboard.css`（CSS変数ベース・ライト/ダーク自動切替）
 - [x] `dashboard/static/js/calendar.js`（カレンダーロジック全体・フィルター・タイムライン描画）
 - [x] `dashboard/templates/base.html`（ナビ・共通レイアウト）
 - [x] `dashboard/templates/calendar.html`（月カレンダーグリッド + 詳細パネル）
 - [x] `dashboard/templates/search.html`
 - [x] `dashboard/templates/summaries.html`
-- [x] `dashboard/templates/stats.html`（Chart.js 月別積み上げグラフ・ソース別バー）
-- [x] `dashboard/templates/sources.html`（トグルスイッチ）
+- [x] `dashboard/templates/stats.html`（Chart.js 月別積み上げ・ソース別バー。`static/js/chart.umd.min.js` ローカル配信、モバイル向けキャンバス最小高さ）
+- [x] 統計: 「月別（直近12ヶ月）」と「年別（全期間）」の表示切替
+- [x] `dashboard/templates/sources.html`（トグル・並べ替え・略称編集・収集ボタン）
 - [x] `planet-dashboard.service` systemd 登録・自動起動設定済み
 - [x] `planet-ingest.service` 廃止（dashboard に統合）
 
@@ -125,10 +129,13 @@
 
 **カレンダー・ナビゲーション**
 - [x] 月カレンダーグリッド + ヒートマップ（投稿数を色で表示）
+- [x] 前後月にまたがる日付セルは薄色表示（週の埋め）。他月クリックでその日へジャンプ
 - [x] 週番号ボタンクリックで週ビュー選択
 - [x] view-tabs `[‹][日][週][月][年][›]` — ‹/› で前後の日/週/月/年に移動
 - [x] view-tabs ↔ カレンダー選択の双方向連動
 - [x] 今日ボタン
+- [x] カレンダー右上: 現在表示中の「○月」「○年」ボタンで月/年タイムラインへ（`goCalMonth` / `goCalYear`。カレンダー上の月は維持。view-tabs の年→月で1月へ落ちる挙動とは別経路）
+- [x] タイムライン見出し `#detail-title`: **表示中タイムラインの期間**のみ表示。`calendar.js` の `tlTitle` + `setTlTitle()` で保持し、`buildCal()` 内の `updateDetailTitle()` は復元のみ（カレンダーの `«‹›»` ナビと表示内容を分離）
 
 **タイムライン**
 - [x] 新着順表示（最新が上）
@@ -139,6 +146,7 @@
 - [x] 外部リンク（↗）
 - [x] メディア添付表示（画像サムネイル・動画プレイボタン）
   - 旧データ（URL未保存）は 📎 アイコン表示
+- [x] 画像サムネイル: ライトボックスで拡大（前後ナビ・キーボード）
 
 **フィルターバー**
 - [x] 折りたたみ式（デフォルト折りたたみ）
@@ -167,6 +175,13 @@
 - [x] ヘルス・写真データのタイムスタンプを「実際の受信時刻」に変更（固定 23:00 → now()）
   - オートメーションの実行確認が可能になった
 
+#### DB・天気・バックフィル（2026-03 追記）
+
+- [x] `data_sources` に `sort_order`（表示順）・`short_name`（一覧用略称、任意）を追加。SQL: `db/migrate_sort_shortname.sql`（所有者は `postgres` で実行する想定）
+- [x] 補助: `db/migrate_sort_shortname.py`（権限により SQL 直実行を推奨）
+- [x] OpenWeatherMap 取得地点: `config/settings.toml` の `lat` / `lon` / `location` を名古屋（愛知）に変更
+- [x] 過去天気バックフィル: `db/backfill_weather.py` — Open-Meteo 履歴を `weather_daily` と `logs` に投入可能（運用は手動実行）
+
 #### 残タスク（Phase 5）
 
 - [ ] デザイン・UI の細部調整（mockup/calender_v3.html との差分修正）
@@ -186,6 +201,8 @@
 
 ## 既知の問題・注意事項
 
+- ソース管理の「今すぐ収集」APIは、クライアント都合で JSON ボディではなく `POST /api/collect/<stype>` のパスパラメータ方式（Tailscale + iOS Safari での `Failed to fetch` 回避）
+- `data_sources` のマイグレーションはテーブル所有者権限が必要。ホーム直下の `.sql` を `postgres` が読めない場合は `/tmp` にコピーして `psql -f` する
 - pon.icu / groundpolis.app は閉鎖済み個人インスタンス。is_active=False、favicon は絵文字フォールバック
 - 過去JSONはMisskey・Mastodon両方とも同一構造（announce/type: Noteの混在）
 - ブーストをインポートするかは settings.toml の include_boosts で制御
@@ -227,7 +244,9 @@ planet/
 │   ├── planet-dashboard.service
 │   ├── static/
 │   │   ├── css/dashboard.css
-│   │   └── js/calendar.js
+│   │   └── js/
+│   │       ├── calendar.js
+│   │       └── chart.umd.min.js   # 統計ページ用 Chart.js（ローカル）
 │   └── templates/
 │       ├── base.html
 │       ├── calendar.html
@@ -237,7 +256,10 @@ planet/
 │       ├── sources.html
 │       └── timeline.html
 ├── db/
-│   └── backfill_media.py       # 既存 Misskey 投稿の media URL バックフィルスクリプト
+│   ├── backfill_media.py       # 既存 Misskey 投稿の media URL バックフィル
+│   ├── backfill_weather.py     # Open-Meteo による過去天気のバックフィル
+│   ├── migrate_sort_shortname.sql
+│   └── migrate_sort_shortname.py  # 権限次第では SQL を postgres で実行
 ├── mockup/
 │   └── calender_v3.html        # UI デザインモックアップ
 ├── docs/
@@ -258,6 +280,8 @@ planet/
 ---
 
 ## data_sources テーブル（現在）
+
+表示順・略称: `sort_order`（整数、小さいほど上）、`short_name`（varchar、NULL 可。未設定時は従来どおり自動短縮名）。
 
 | id | name | type |
 |---|---|---|

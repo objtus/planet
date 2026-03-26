@@ -1,6 +1,8 @@
 """Planet ダッシュボード Flask アプリ (Phase 5)"""
 
+import os
 import sys
+import subprocess
 import tomllib
 import psycopg2
 from pathlib import Path
@@ -55,31 +57,39 @@ def get_db_conn():
     )
 
 
+def _auto_short_name(stype, base_url, name):
+    """種別・URL から短縮名を自動生成する"""
+    domain = (base_url or "").replace("https://", "").replace("http://", "").rstrip("/")
+    fixed  = {"lastfm": "last.fm", "health": "health", "photo": "photo",
+              "weather": "weather", "github": "github", "youtube": "youtube"}
+    return fixed.get(stype) or SHORT_NAME_MAP.get(domain) or domain or name
+
+
 def make_source_info(row):
-    """data_sources の行から表示用の dict を返す"""
+    """data_sources の行から表示用の dict を返す。
+    row は (id, name, type, base_url, account, is_active[, sort_order, short_name]) の形式。
+    short_name が DB に保存されていればそれを優先し、なければ自動生成。
+    """
     sid       = row[0]
     name      = row[1]
     stype     = row[2]
     base_url  = row[3]
     account   = row[4]
     is_active = row[5] if len(row) > 5 else True
+    db_short  = row[7] if len(row) > 7 else None  # row[6]=sort_order, row[7]=short_name
 
     domain = (base_url or "").replace("https://", "").replace("http://", "").rstrip("/")
     info   = TYPE_INFO.get(stype, {"cls": "rss", "emoji": "🌐", "favicon": None})
 
-    # 短縮名
-    fixed = {"lastfm": "last.fm", "health": "health", "photo": "photo",
-             "weather": "weather", "github": "github", "youtube": "youtube"}
-    short_name = fixed.get(stype) or SHORT_NAME_MAP.get(domain) or domain or name
+    short_name = db_short or _auto_short_name(stype, base_url, name)
 
-    # favicon URL の決定
     # 廃止サーバー（is_active=False）はドメインが死んでいる可能性が高いので None
     if not is_active:
         favicon = None
     elif base_url:
         favicon = f"{base_url}/favicon.ico"
     else:
-        favicon = info.get("favicon")  # 種別別に既知 URL を使用
+        favicon = info.get("favicon")
 
     return {
         "id":          sid,
@@ -119,9 +129,9 @@ def create_app():
 
             # 全ソース（廃止含む）— タイムライン中の過去エントリのバッジ表示に必要
             cur.execute("""
-                SELECT id, name, type, base_url, account, is_active
+                SELECT id, name, type, base_url, account, is_active, sort_order, short_name
                   FROM data_sources
-                 ORDER BY id
+                 ORDER BY sort_order, id
             """)
             sources = [make_source_info(r) for r in cur.fetchall()]
 
@@ -442,6 +452,17 @@ def create_app():
             monthly_raw = cur.fetchall()
 
             cur.execute("""
+                SELECT EXTRACT(year FROM timestamp AT TIME ZONE 'Asia/Tokyo')::int AS year,
+                       ds.type, COUNT(*)
+                  FROM logs l
+                  JOIN data_sources ds ON l.source_id = ds.id
+                 WHERE l.is_deleted = FALSE
+                 GROUP BY year, ds.type
+                 ORDER BY year, ds.type
+            """)
+            yearly_raw = cur.fetchall()
+
+            cur.execute("""
                 SELECT ds.name, ds.type, COUNT(*)
                   FROM logs l
                   JOIN data_sources ds ON l.source_id = ds.id
@@ -454,7 +475,8 @@ def create_app():
             cur.close(); conn.close()
 
         return render_template("stats.html",
-            monthly_raw=monthly_raw, source_counts=source_counts)
+            monthly_raw=monthly_raw, yearly_raw=yearly_raw,
+            source_counts=source_counts)
 
     # ------------------------------------------------------------------ #
     # ソース管理
@@ -465,14 +487,22 @@ def create_app():
         cur  = conn.cursor()
         try:
             cur.execute("""
-                SELECT id, name, type, base_url, account, is_active, created_at
-                  FROM data_sources ORDER BY id
+                SELECT id, name, type, base_url, account, is_active,
+                       created_at, sort_order, short_name
+                  FROM data_sources ORDER BY sort_order, id
             """)
             rows  = cur.fetchall()
             items = [{
-                "id": r[0], "name": r[1], "type": r[2],
-                "base_url": r[3], "account": r[4], "is_active": r[5],
+                "id":         r[0],
+                "name":       r[1],
+                "type":       r[2],
+                "base_url":   r[3],
+                "account":    r[4],
+                "is_active":  r[5],
                 "created_at": r[6].astimezone(JST).strftime("%Y-%m-%d") if r[6] else "",
+                "sort_order": r[7],
+                "short_name_db":   r[8],
+                "short_name_auto": _auto_short_name(r[2], r[3], r[1]),
             } for r in rows]
         finally:
             cur.close(); conn.close()
@@ -496,6 +526,104 @@ def create_app():
             return jsonify({"error": str(e)}), 500
         finally:
             cur.close(); conn.close()
+
+    @app.route("/sources/<int:source_id>/move", methods=["POST"])
+    def source_move(source_id):
+        direction = request.json.get("direction")  # "up" | "down"
+        if direction not in ("up", "down"):
+            return jsonify({"error": "invalid direction"}), 400
+        conn = get_db_conn()
+        cur  = conn.cursor()
+        try:
+            cur.execute("SELECT sort_order FROM data_sources WHERE id = %s", (source_id,))
+            row = cur.fetchone()
+            if not row:
+                return jsonify({"error": "not found"}), 404
+            cur_order = row[0]
+
+            if direction == "up":
+                cur.execute("""
+                    SELECT id, sort_order FROM data_sources
+                     WHERE sort_order < %s ORDER BY sort_order DESC LIMIT 1
+                """, (cur_order,))
+            else:
+                cur.execute("""
+                    SELECT id, sort_order FROM data_sources
+                     WHERE sort_order > %s ORDER BY sort_order ASC LIMIT 1
+                """, (cur_order,))
+
+            adj = cur.fetchone()
+            if not adj:
+                return jsonify({"ok": True})  # 端なので何もしない
+
+            adj_id, adj_order = adj
+            cur.execute("UPDATE data_sources SET sort_order = %s WHERE id = %s", (adj_order, source_id))
+            cur.execute("UPDATE data_sources SET sort_order = %s WHERE id = %s", (cur_order, adj_id))
+            conn.commit()
+            return jsonify({"ok": True})
+        except Exception as e:
+            conn.rollback()
+            return jsonify({"error": str(e)}), 500
+        finally:
+            cur.close(); conn.close()
+
+    @app.route("/sources/<int:source_id>/rename", methods=["POST"])
+    def source_rename(source_id):
+        short_name = (request.json.get("short_name") or "").strip()
+        conn = get_db_conn()
+        cur  = conn.cursor()
+        try:
+            cur.execute(
+                "UPDATE data_sources SET short_name = %s WHERE id = %s",
+                (short_name or None, source_id),
+            )
+            conn.commit()
+            return jsonify({"ok": True, "short_name": short_name or None})
+        except Exception as e:
+            conn.rollback()
+            return jsonify({"error": str(e)}), 500
+        finally:
+            cur.close(); conn.close()
+
+    # ------------------------------------------------------------------ #
+    # API: 手動収集
+    # ------------------------------------------------------------------ #
+    COLLECTOR_MAP = {
+        "misskey":  ROOT / "collectors" / "misskey.py",
+        "mastodon": ROOT / "collectors" / "mastodon.py",
+        "lastfm":   ROOT / "collectors" / "lastfm.py",
+        "weather":  ROOT / "collectors" / "weather.py",
+        "github":   ROOT / "collectors" / "github.py",
+        "rss":      ROOT / "collectors" / "rss.py",
+        "youtube":  ROOT / "collectors" / "youtube.py",
+        "all":      ROOT / "collect_all.py",
+    }
+    PYTHON = ROOT / "venv" / "bin" / "python"
+
+    @app.route("/api/collect/<string:stype>", methods=["POST"])
+    def api_collect(stype):
+        script = COLLECTOR_MAP.get(stype)
+        if not script:
+            return jsonify({"error": f"収集スクリプトがありません（{stype}）"}), 400
+        try:
+            env = {**os.environ, "PYTHONPATH": str(ROOT)}
+            result = subprocess.run(
+                [str(PYTHON), str(script)],
+                capture_output=True, text=True,
+                timeout=120, cwd=str(ROOT),
+                env=env,
+            )
+            if result.returncode == 0:
+                # 最後の 600 文字だけ返す（大量出力対策）
+                out = (result.stdout or "").strip()
+                return jsonify({"ok": True, "output": out[-600:] if out else "完了"})
+            else:
+                err = (result.stderr or result.stdout or "エラー").strip()
+                return jsonify({"error": err[-600:]}), 500
+        except subprocess.TimeoutExpired:
+            return jsonify({"error": "タイムアウト（120秒）"}), 504
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
 
     return app
 

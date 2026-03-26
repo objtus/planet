@@ -15,7 +15,12 @@
         <button onclick="shiftMonth(1)" title="次の月">›</button>
         <button onclick="shiftYear(1)"  title="次の年">»</button>
       </div>
-      <button onclick="goToday()">今日</button>
+      <div class="cal-header-right">
+        <button id="btn-cal-month" class="cal-view-btn" onclick="goCalMonth()" title="この月のタイムラインを表示"></button>
+        <button id="btn-cal-year"  class="cal-view-btn" onclick="goCalYear()"  title="この年のタイムラインを表示"></button>
+        <span class="filter-sep"></span>
+        <button onclick="goToday()">今日</button>
+      </div>
     </div>
 
     <table class="cal-grid">

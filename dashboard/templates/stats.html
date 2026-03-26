@@ -2,7 +2,7 @@
 {% block title %}統計 — Planet{% endblock %}
 
 {% block head %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='js/chart.umd.min.js') }}"></script>
 {% endblock %}
 
 {% block content %}
@@ -23,10 +23,16 @@
     {% endfor %}
   </div>
 
-  <!-- 月別グラフ -->
+  <!-- 月別 / 年別グラフ -->
   <div class="card">
-    <p class="section-title">月別投稿数（直近12ヶ月）</p>
-    <canvas id="monthlyChart" height="80"></canvas>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <p class="section-title" id="chart-title" style="margin-bottom:0">月別投稿数（直近12ヶ月）</p>
+      <div class="view-tabs">
+        <button id="btn-monthly" class="active" onclick="switchChart('month')">月別</button>
+        <button id="btn-yearly"  onclick="switchChart('year')">年別</button>
+      </div>
+    </div>
+    <canvas id="monthlyChart" style="min-height:180px"></canvas>
   </div>
 
 </div>
@@ -34,39 +40,67 @@
 
 {% block scripts %}
 <script>
-const monthlyRaw = {{ monthly_raw | tojson }};
-const months  = [...new Set(monthlyRaw.map(r => r[0]))].sort();
-const types   = [...new Set(monthlyRaw.map(r => r[1]))];
-const COLORS  = {
+const COLORS = {
   misskey:'#378ADD', mastodon:'#6364ff', lastfm:'#d51002',
   health:'#3fb950',  photo:'#f0883e',   weather:'#58a6ff',
   github:'#8b949e',  rss:'#ffa640',     youtube:'#ff0000',
 };
-const datasets = types.map(type => {
-  const m = {};
-  monthlyRaw.filter(r => r[1] === type).forEach(r => m[r[0]] = r[2]);
-  return {
-    label: type,
-    data: months.map(mo => m[mo] || 0),
-    backgroundColor: (COLORS[type] || '#8b949e') + '99',
-    borderColor:      COLORS[type] || '#8b949e',
-    borderWidth: 1,
-    stack: 'main',
-  };
-});
-new Chart(document.getElementById('monthlyChart'), {
-  type: 'bar',
-  data: { labels: months, datasets },
-  options: {
-    responsive: true,
-    plugins: {
-      legend: { labels: { color: '#666', boxWidth: 12, font: { size: 11 } } },
-    },
-    scales: {
-      x: { stacked: true, ticks: { color:'#999', font:{size:10} }, grid: { color:'rgba(0,0,0,0.06)' } },
-      y: { stacked: true, ticks: { color:'#999', font:{size:10} }, grid: { color:'rgba(0,0,0,0.06)' } },
-    },
+
+const CHART_TITLES = {
+  month: '月別投稿数（直近12ヶ月）',
+  year:  '年別投稿数（全期間）',
+};
+
+const CHART_OPTIONS = {
+  responsive: true,
+  plugins: {
+    legend: { labels: { color: '#666', boxWidth: 12, font: { size: 11 } } },
   },
+  scales: {
+    x: { stacked: true, ticks: { color:'#999', font:{size:10} }, grid: { color:'rgba(0,0,0,0.06)' } },
+    y: { stacked: true, ticks: { color:'#999', font:{size:10} }, grid: { color:'rgba(0,0,0,0.06)' } },
+  },
+};
+
+function buildDatasets(raw, labelKey) {
+  const labels  = [...new Set(raw.map(r => String(r[0])))].sort();
+  const types   = [...new Set(raw.map(r => r[1]))];
+  const datasets = types.map(type => {
+    const m = {};
+    raw.filter(r => r[1] === type).forEach(r => m[String(r[0])] = r[2]);
+    return {
+      label: type,
+      data: labels.map(l => m[l] || 0),
+      backgroundColor: (COLORS[type] || '#8b949e') + '99',
+      borderColor:      COLORS[type] || '#8b949e',
+      borderWidth: 1,
+      stack: 'main',
+    };
+  });
+  return { labels, datasets };
+}
+
+const monthData = buildDatasets({{ monthly_raw | tojson }});
+const yearData  = buildDatasets({{ yearly_raw  | tojson }});
+
+const chart = new Chart(document.getElementById('monthlyChart'), {
+  type: 'bar',
+  data: { labels: monthData.labels, datasets: monthData.datasets },
+  options: CHART_OPTIONS,
 });
+
+let chartMode = 'month';
+
+function switchChart(mode) {
+  if (mode === chartMode) return;
+  chartMode = mode;
+  const data = mode === 'month' ? monthData : yearData;
+  chart.data.labels   = data.labels;
+  chart.data.datasets = data.datasets;
+  chart.update();
+  document.getElementById('chart-title').textContent = CHART_TITLES[mode];
+  document.getElementById('btn-monthly').classList.toggle('active', mode === 'month');
+  document.getElementById('btn-yearly').classList.toggle('active', mode === 'year');
+}
 </script>
 {% endblock %}
