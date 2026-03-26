@@ -75,6 +75,36 @@ def _fetch_push_commits_from_api(
     return 0, []
 
 
+def build_push_summary(
+    repo_name: str, payload: dict, headers: dict
+) -> tuple[int, str, str]:
+    """PushEvent 用の commit_count / summary / logs.content 用本文を組み立てる。"""
+    commit_count = int(payload.get("size", 0) or 0)
+    msgs = [
+        (c.get("message") or "").split("\n", 1)[0].strip()
+        for c in (payload.get("commits") or [])
+        if (c.get("message") or "").strip()
+    ]
+    if commit_count == 0 and msgs:
+        commit_count = len(msgs)
+    if not msgs:
+        api_n, api_msgs = _fetch_push_commits_from_api(repo_name, payload, headers)
+        if api_msgs:
+            msgs = api_msgs
+        if api_n:
+            commit_count = api_n
+        elif msgs and commit_count == 0:
+            commit_count = len(msgs)
+    if msgs:
+        summary = f"Push {commit_count}件: " + " / ".join(msgs[:5])
+    elif commit_count > 0:
+        summary = f"Push {commit_count}件（メッセージ未取得）"
+    else:
+        summary = "Push（Events API にコミット情報なし）"
+    content = f"{repo_name}: {summary}"
+    return commit_count, summary, content
+
+
 class GithubCollector(BaseCollector):
 
     def collect(self):
@@ -116,33 +146,9 @@ class GithubCollector(BaseCollector):
                 payload = event.get("payload", {})
 
                 if event["type"] == "PushEvent":
-                    commit_count = int(payload.get("size", 0) or 0)
-                    msgs = [
-                        (c.get("message") or "").split("\n", 1)[0].strip()
-                        for c in (payload.get("commits") or [])
-                        if (c.get("message") or "").strip()
-                    ]
-                    if commit_count == 0 and msgs:
-                        commit_count = len(msgs)
-                    if not msgs:
-                        api_n, api_msgs = _fetch_push_commits_from_api(
-                            repo_name, payload, headers
-                        )
-                        if api_msgs:
-                            msgs = api_msgs
-                        if api_n:
-                            commit_count = api_n
-                        elif msgs and commit_count == 0:
-                            commit_count = len(msgs)
-                    if msgs:
-                        summary = (
-                            f"Push {commit_count}件: " + " / ".join(msgs[:5])
-                        )
-                    elif commit_count > 0:
-                        summary = f"Push {commit_count}件（メッセージ未取得）"
-                    else:
-                        summary = "Push（Events API にコミット情報なし）"
-                    content = f"{repo_name}: {summary}"
+                    commit_count, summary, content = build_push_summary(
+                        repo_name, payload, headers
+                    )
                 elif event["type"] == "CreateEvent":
                     ref_type = payload.get("ref_type", "")
                     ref = payload.get("ref", "")
