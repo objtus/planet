@@ -165,6 +165,7 @@ CREATE TABLE url_metadata (
 );
 
 -- 5-11. summaries
+-- period_type: 'weekly' | 'monthly' | 'daily'（日次は週次階層生成時に保存、一覧 /summaries では週・月のみ表示）
 CREATE TABLE summaries (
     id           BIGSERIAL PRIMARY KEY,
     period_type  TEXT NOT NULL,

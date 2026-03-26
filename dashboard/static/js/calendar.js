@@ -550,13 +550,16 @@ async function loadDay() {
   clearStats();
   showFilterBarForTimeline(true);
   try {
-    const [tl, stats] = await Promise.all([
+    const [tl, stats, sumPayload] = await Promise.all([
       fetchJSON(`/api/timeline?period=day&date=${ds}`),
       fetchJSON(`/api/stats?date=${ds}`),
+      fetchSummaryPayload('day', ds),
     ]);
     renderStats(stats);
     renderTimeline(tl.entries, 'day');
+    renderSummaryPanelDay(sumPayload, ds);
   } catch (e) {
+    hideSummaryPanel();
     showTimelineError(e.message);
   }
 }
@@ -714,6 +717,44 @@ async function fetchSummaryPayload(period, dateStr) {
     return await fetchJSON(u);
   } catch (_) {
     return period === 'year' ? { summaries: [] } : { summary: null };
+  }
+}
+
+function renderSummaryPanelDay(payload, isoDateStr) {
+  const p = document.getElementById('summary-panel');
+  const title = document.getElementById('summary-panel-title');
+  const genBtn = document.getElementById('summary-generate-btn');
+  const body = document.getElementById('summary-panel-body');
+  if (!p || !title || !body) return;
+  p.hidden = false;
+  title.textContent = '日次サマリー';
+  if (genBtn) {
+    genBtn.hidden = false;
+    genBtn.dataset.period = 'day';
+    genBtn.dataset.date = String(isoDateStr);
+    genBtn.dataset.viewKind = 'day';
+    genBtn.disabled = false;
+    genBtn.textContent = 'この日の日次を生成';
+  }
+  body.replaceChildren();
+  const sum = payload && payload.summary;
+  if (sum && sum.content) {
+    const block = typeof renderSummaryMarkdown === 'function'
+      ? renderSummaryMarkdown(sum.content)
+      : (() => {
+          const pre = document.createElement('pre');
+          pre.className = 'summary-panel-text';
+          pre.textContent = sum.content;
+          return pre;
+        })();
+    block.classList.add('summary-panel-md');
+    body.appendChild(block);
+  } else {
+    const empty = document.createElement('p');
+    empty.className = 'summary-panel-empty';
+    empty.textContent =
+      'この日の日次要約はまだありません。下のボタンでこの日だけ生成できます（週次生成時も保存され、週次では再利用されます）。';
+    body.appendChild(empty);
   }
 }
 
@@ -882,7 +923,8 @@ async function onSummaryGenerateClick() {
   }
 
   const ctrl = new AbortController();
-  const abortTid = setTimeout(() => ctrl.abort(), 3600000);
+  const abortMs = period === 'day' ? 7200000 : 18000000;
+  const abortTid = setTimeout(() => ctrl.abort(), abortMs);
 
   try {
     const r = await fetch('/api/summaries/generate', {
@@ -936,7 +978,11 @@ async function onSummaryGenerateClick() {
     }
 
     const sumPayload = await fetchSummaryPayload(period, date);
-    renderSummaryPanelWeekOrMonth(viewKind, sumPayload, date);
+    if (viewKind === 'day') {
+      renderSummaryPanelDay(sumPayload, date);
+    } else {
+      renderSummaryPanelWeekOrMonth(viewKind, sumPayload, date);
+    }
   } catch (e) {
     if (e.name === 'AbortError') {
       alert('通信がタイムアウトまたは中断されました。');
@@ -1454,4 +1500,48 @@ document.getElementById('summary-generate-btn')?.addEventListener('click', () =>
     });
   }
 }
-void refreshCalWithHeat().then(() => loadDay());
+
+/**
+ * /?view=day&date=YYYY-MM-DD（サマリー一覧の週→日リンク用）。成功時 true。
+ */
+function initCalendarFromQuery() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const view = (params.get('view') || '').toLowerCase();
+    const ds = params.get('date');
+    if (view !== 'day' || !ds || !/^\d{4}-\d{2}-\d{2}$/.test(ds)) return false;
+    const parts = ds.split('-').map((x) => parseInt(x, 10));
+    const y = parts[0];
+    const mo = parts[1];
+    const d = parts[2];
+    if (!y || mo < 1 || mo > 12 || d < 1 || d > 31) return false;
+    const trial = new Date(y, mo - 1, d);
+    if (
+      trial.getFullYear() !== y ||
+      trial.getMonth() !== mo - 1 ||
+      trial.getDate() !== d
+    ) {
+      return false;
+    }
+    cur.year = y;
+    cur.month = mo - 1;
+    cur.selDay = d;
+    cur.selWeek = null;
+    cur.viewMode = 'day';
+    setActiveTab('tab-day');
+    syncTabLabel();
+    const selM = document.getElementById('sel-month');
+    const selY = document.getElementById('sel-year');
+    if (selM) selM.value = String(cur.month);
+    if (selY) selY.value = String(cur.year);
+    window.history.replaceState({}, '', window.location.pathname);
+    void refreshCalWithHeat().then(() => loadDay());
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+if (!initCalendarFromQuery()) {
+  void refreshCalWithHeat().then(() => loadDay());
+}

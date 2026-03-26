@@ -568,16 +568,41 @@ def create_app():
                 SELECT id, period_type, period_start, period_end,
                        week_number, content, model, is_published, created_at
                   FROM summaries
+                 WHERE period_type IN ('weekly', 'monthly')
                  ORDER BY period_start DESC
             """)
             rows  = cur.fetchall()
-            items = [{
-                "id": r[0], "period_type": r[1],
-                "period_start": str(r[2]), "period_end": str(r[3]),
-                "week_number": r[4], "content": r[5],
-                "model": r[6], "is_published": r[7],
-                "created_at": r[8].astimezone(JST).strftime("%Y-%m-%d %H:%M") if r[8] else "",
-            } for r in rows]
+            dow_jp = ["月", "火", "水", "木", "金", "土", "日"]
+            items = []
+            for r in rows:
+                it = {
+                    "id": r[0],
+                    "period_type": r[1],
+                    "period_start": str(r[2]),
+                    "period_end": str(r[3]),
+                    "week_number": r[4],
+                    "content": r[5],
+                    "model": r[6],
+                    "is_published": r[7],
+                    "created_at": r[8].astimezone(JST).strftime("%Y-%m-%d %H:%M")
+                    if r[8]
+                    else "",
+                    "day_links": None,
+                }
+                if r[1] == "weekly" and r[2]:
+                    monday = r[2]
+                    links = []
+                    for i in range(7):
+                        d = monday + timedelta(days=i)
+                        wd = dow_jp[d.weekday()]
+                        links.append(
+                            {
+                                "date": str(d),
+                                "label": f"{d.month}/{d.day}({wd})",
+                            }
+                        )
+                    it["day_links"] = links
+                items.append(it)
         finally:
             cur.close(); conn.close()
 
@@ -604,12 +629,33 @@ def create_app():
     def api_summary():
         period = (request.args.get("period") or "").strip().lower()
         date_arg = (request.args.get("date") or "").strip()
-        if period not in ("week", "month", "year") or not date_arg:
-            return jsonify({"error": "period (week|month|year) and date required"}), 400
+        if period not in ("day", "week", "month", "year") or not date_arg:
+            return jsonify(
+                {"error": "period (day|week|month|year) and date required"}
+            ), 400
 
         conn = get_db_conn()
         cur = conn.cursor()
         try:
+            if period == "day":
+                try:
+                    day = date.fromisoformat(date_arg)
+                except ValueError:
+                    return jsonify({"error": "date must be YYYY-MM-DD for day"}), 400
+                cur.execute(
+                    """
+                    SELECT id, period_type, period_start, period_end, week_number,
+                           content, model, is_published, published_at
+                      FROM summaries
+                     WHERE period_type = 'daily' AND period_start = %s
+                    """,
+                    (day,),
+                )
+                row = cur.fetchone()
+                return jsonify(
+                    {"summary": _summary_row_to_api_dict(row) if row else None}
+                )
+
             if period == "week":
                 s = date_arg.upper()
                 if "-W" not in s:
@@ -717,13 +763,15 @@ def create_app():
 
     @app.route("/api/summaries/generate", methods=["POST"])
     def api_summaries_generate():
-        """Ollama 週次・月次サマリーを subprocess で生成（カレンダー UI 用）。"""
+        """Ollama 週次・月次・日次サマリーを subprocess で生成（カレンダー UI 用）。"""
         data = request.get_json(silent=True) or {}
         period = (data.get("period") or "").strip().lower()
         date_arg = (data.get("date") or "").strip()
         want_stream = bool(data.get("stream"))
-        if period not in ("week", "month") or not date_arg:
-            return jsonify({"error": "period (week|month) と date が必要です"}), 400
+        if period not in ("week", "month", "day") or not date_arg:
+            return jsonify(
+                {"error": "period (week|month|day) と date が必要です"}
+            ), 400
 
         if period == "week":
             try:
@@ -733,7 +781,7 @@ def create_app():
                 norm_date = f"{y}-W{w:02d}"
             except ValueError as e:
                 return jsonify({"error": str(e)}), 400
-        else:
+        elif period == "month":
             try:
                 from summarizer.month_bounds import parse_year_month
 
@@ -741,11 +789,18 @@ def create_app():
                 norm_date = f"{y}-{mo:02d}"
             except ValueError as e:
                 return jsonify({"error": str(e)}), 400
+        else:
+            try:
+                norm_date = date.fromisoformat(date_arg).isoformat()
+            except ValueError:
+                return jsonify({"error": "day の date は YYYY-MM-DD 形式です"}), 400
 
         py_exe = ROOT / "venv" / "bin" / "python"
         if not py_exe.is_file():
             return jsonify({"error": "venv/bin/python が見つかりません"}), 500
 
+        # 1 リクエストあたりの Ollama 待ち。週次階層は最大 9 回呼ぶため、壁時計は gen_timeout で別途長めに。
+        ollama_timeout = "1800"
         cmd = [
             str(py_exe),
             "-m",
@@ -754,11 +809,14 @@ def create_app():
             period,
             "--date",
             norm_date,
-            "--pipeline",
-            "hierarchical",
+            "--timeout",
+            ollama_timeout,
         ]
+        if period in ("week", "month"):
+            cmd.extend(["--pipeline", "hierarchical"])
         env_base = {**os.environ, "PYTHONPATH": str(ROOT)}
-        gen_timeout = 3600
+        # subprocess.run の上限。週次は日次最大7+マージで合計が長くなりやすい。
+        gen_timeout = 7200 if period == "day" else 18000
 
         if want_stream:
             env_stream = {

@@ -13,6 +13,12 @@
   # 階層+dry-run で各日のプロンプトも見る
   ./venv/bin/python -m summarizer.generate --period week --date 2026-W1 --dry-run --dry-run-daily
 
+  # 週次だけ作り直す（日次は DB にあれば LLM 再実行しない）
+  # 日次も全部やり直すときは --regenerate-daily
+
+  # 1 日だけ日次要約を生成（DB に保存。週次マージ時に再利用される）
+  ./venv/bin/python -m summarizer.generate --period day --date 2026-01-04
+
 `config/settings.toml` に `[ollama]`（`base_url`, `model`）と `[database]` が必要。
 `--dry-run` のときは DB 接続のみ（Ollama 設定は未使用でもよい）。
 """
@@ -261,6 +267,58 @@ def upsert_monthly(
     conn.commit()
 
 
+DAILY_PROMPT_STYLE = "hybrid_hierarchical_daily"
+
+
+def fetch_daily_summary_content(conn, day: date) -> str | None:
+    """保存済み日次要約の本文。無ければ None。"""
+    sql = """
+        SELECT content FROM summaries
+         WHERE period_type = 'daily' AND period_start = %s
+    """
+    with conn.cursor() as cur:
+        cur.execute(sql, (day,))
+        row = cur.fetchone()
+    if not row or not (row[0] or "").strip():
+        return None
+    return str(row[0]).strip()
+
+
+def upsert_daily(
+    conn,
+    day: date,
+    content: str,
+    model: str,
+    *,
+    prompt_style: str = DAILY_PROMPT_STYLE,
+) -> None:
+    """対象日は JST 暦日。period_end も同一日（時刻は created_at に任せる）。"""
+    sql = """
+        INSERT INTO summaries (
+            period_type, period_start, period_end, week_number,
+            content, model, prompt_style
+        )
+        VALUES ('daily', %s, %s, NULL, %s, %s, %s)
+        ON CONFLICT (period_type, period_start)
+        DO UPDATE SET
+            period_end   = EXCLUDED.period_end,
+            content      = EXCLUDED.content,
+            model        = EXCLUDED.model,
+            prompt_style = EXCLUDED.prompt_style
+    """
+    with conn.cursor() as cur:
+        cur.execute(sql, (day, day, content, model, prompt_style))
+    conn.commit()
+
+
+def delete_daily_summary(conn, day: date) -> None:
+    """ログ無し日などで古い日次行を消す。"""
+    sql = "DELETE FROM summaries WHERE period_type = 'daily' AND period_start = %s"
+    with conn.cursor() as cur:
+        cur.execute(sql, (day,))
+    conn.commit()
+
+
 def _ollama_config():
     cfg = load_config()
     ollama_cfg = cfg.get("ollama") or {}
@@ -270,23 +328,23 @@ def _ollama_config():
 
 
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(description="Planet 週次・月次サマリー生成（Ollama）")
+    p = argparse.ArgumentParser(description="Planet 週・月・日サマリー生成（Ollama）")
     p.add_argument(
         "--period",
-        choices=["week", "month"],
+        choices=["week", "month", "day"],
         default="week",
-        help="week または month",
+        help="week / month / day（day は日次要約のみ 1 回）",
     )
     p.add_argument(
         "--date",
         required=True,
-        help="week のとき YYYY-Www / month のとき YYYY-MM（例: 2026-01）",
+        help="week: YYYY-Www / month: YYYY-MM / day: YYYY-MM-DD",
     )
     p.add_argument(
         "--pipeline",
         choices=["flat", "hierarchical"],
         default="hierarchical",
-        help="flat=生ログ一括（従来） / hierarchical=日→週 または 週→月（既定）",
+        help="week・month のみ有効。day は無視される",
     )
     p.add_argument(
         "--timeout",
@@ -304,6 +362,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="--dry-run かつ週次 hierarchical のとき、7 日分の日次プロンプトも先に出力する",
     )
+    p.add_argument(
+        "--regenerate-daily",
+        action="store_true",
+        help="週次 hierarchical 時、日次要約を毎回 LLM で作り直す（既定は DB にあれば再利用）",
+    )
     args = p.parse_args(argv)
 
     if not args.dry_run:
@@ -319,11 +382,64 @@ def main(argv: list[str] | None = None) -> int:
 
     conn = get_conn()
     try:
+        if args.period == "day":
+            return _run_day(conn, args, base_url, model, dry_run=args.dry_run)
         if args.period == "week":
             return _run_week(conn, args, base_url, model, dry_run=args.dry_run)
         return _run_month(conn, args, base_url, model, dry_run=args.dry_run)
     finally:
         conn.close()
+
+
+def _run_day(
+    conn,
+    args,
+    base_url: str,
+    model: str,
+    *,
+    dry_run: bool,
+) -> int:
+    """1 暦日の日次要約のみ生成して summaries に保存（週次 hierarchical で再利用可）。"""
+    raw = (args.date or "").strip()
+    try:
+        d = date.fromisoformat(raw)
+    except ValueError:
+        print(
+            "day の --date は YYYY-MM-DD 形式で指定してください（例: 2026-01-04）",
+            file=sys.stderr,
+        )
+        return 2
+
+    day_label = f"{d.strftime('%Y-%m-%d')}（JST）"
+    digest = fetch_activity_digest_for_day(conn, d, max_lines=MAX_LOG_LINES_DAILY)
+    if not digest.strip():
+        print(f"ログが 0 件のためスキップします: {day_label}", file=sys.stderr)
+        return 0
+
+    tmpl = _load_daily_template()
+    prompt = _build_daily_prompt(tmpl, day_label=day_label, digest=digest)
+
+    if dry_run:
+        print(prompt)
+        return 0
+
+    emit_summary_progress(1, 1, phase="daily", label=d.isoformat())
+
+    try:
+        out = generate_text(
+            base_url, model, prompt, timeout_sec=args.timeout
+        )
+    except Exception:
+        return 1
+
+    if not out or not out.strip():
+        print("Ollama から空の応答が返りました", file=sys.stderr)
+        return 1
+
+    body = out.strip()
+    upsert_daily(conn, d, body, model)
+    print(f"保存しました: daily {d.isoformat()}")
+    return 0
 
 
 def _run_week(
@@ -489,6 +605,7 @@ def _run_week_hierarchical(
         day_label = f"{d.strftime('%Y-%m-%d')}（JST）"
         day_iso = d.isoformat()
         if not dig.strip():
+            delete_daily_summary(conn, d)
             emit_summary_progress(
                 step, total_steps, phase="daily_skip", label=day_iso
             )
@@ -497,27 +614,42 @@ def _run_week_hierarchical(
             d += timedelta(days=1)
             continue
 
-        emit_summary_progress(step, total_steps, phase="daily", label=day_iso)
-
-        daily_prompt = _build_daily_prompt(
-            daily_tmpl, day_label=day_label, digest=dig
+        cached = (
+            None
+            if getattr(args, "regenerate_daily", False)
+            else fetch_daily_summary_content(conn, d)
         )
-        try:
-            daily_out = generate_text(
-                base_url, model, daily_prompt, timeout_sec=args.timeout
+        if cached:
+            emit_summary_progress(
+                step, total_steps, phase="daily_reuse", label=day_iso
             )
-        except Exception:
-            print(
-                f"警告: {day_label} の日次要約で Ollama エラー（プレースホルダで続行）",
-                file=sys.stderr,
+            daily_out = cached
+        else:
+            emit_summary_progress(step, total_steps, phase="daily", label=day_iso)
+            daily_prompt = _build_daily_prompt(
+                daily_tmpl, day_label=day_label, digest=dig
             )
-            daily_out = "（この日の要約の生成に失敗しました。）"
-        if not daily_out:
-            print(
-                f"警告: {day_label} の日次要約が空でした（プレースホルダで続行）",
-                file=sys.stderr,
-            )
-            daily_out = "（この日の要約が空でした。）"
+            try:
+                daily_out = generate_text(
+                    base_url, model, daily_prompt, timeout_sec=args.timeout
+                )
+            except Exception:
+                print(
+                    f"警告: {day_label} の日次要約で Ollama エラー（プレースホルダで続行）",
+                    file=sys.stderr,
+                )
+                daily_out = "（この日の要約の生成に失敗しました。）"
+            if not daily_out:
+                print(
+                    f"警告: {day_label} の日次要約が空でした（プレースホルダで続行）",
+                    file=sys.stderr,
+                )
+                daily_out = "（この日の要約が空でした。）"
+            else:
+                body_to_store = daily_out.strip()
+                if not body_to_store.startswith("（この日の要約"):
+                    upsert_daily(conn, d, body_to_store, model)
+
         daily_blocks.append(f"### {day_label}\n\n{daily_out.strip()}\n")
         d += timedelta(days=1)
 

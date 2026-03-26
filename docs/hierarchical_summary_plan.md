@@ -3,7 +3,7 @@
 **目的**: 週次サマリー生成時に **1 本の極長プロンプト**へ生ログを詰め込む方式の限界を避け、**日 → 週 → 月 → 年**と要約を積み上げられる設計に移行する。  
 **最終更新**: 2026-03-26
 
-**実装状況（コード）**: 週次の **日→週**（`--pipeline hierarchical` 既定）・月次の **週→月**（同既定、週次0件時は生ログフラットにフォールバック）・`fetch_activity_digest_for_day`・`--dry-run-daily` まで反映済み。年次は未着手。
+**実装状況（コード）**: 週次の **日→週**（`--pipeline hierarchical` 既定）・月次の **週→月**（同既定、週次0件時は生ログフラットにフォールバック）・`fetch_activity_digest_for_day`・`--dry-run-daily`・**日次の DB 保存・週再生成時の再利用（`--regenerate-daily` で全再生成）**・`GET /api/summary?period=day`・カレンダー日パネル・`/summaries` の週→7 日リンク。詳細は **`docs/summary_daily_and_dashboard.md`**。年次は未着手。
 
 **関連**: [`phase6_plan.md`](phase6_plan.md)（Phase 6 全体）、[`summary_integration_plan.md`](summary_integration_plan.md)（`summaries` 契約）、実装コード `summarizer/generate.py`・`summarizer/context.py`
 

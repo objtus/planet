@@ -22,13 +22,20 @@
         </label>
         <span style="font-size:11px;color:var(--color-text-tertiary);margin-left:auto">{{ item.created_at }}</span>
       </div>
+      {% if item.period_type == 'weekly' and item.day_links %}
+      <nav class="summary-week-day-links" aria-label="この週の日次サマリー（カレンダー日ビュー）">
+        {% for dl in item.day_links %}
+        <a class="summary-day-link" href="{{ url_for('calendar') }}?view=day&amp;date={{ dl.date }}">{{ dl.label }}</a>
+        {% endfor %}
+      </nav>
+      {% endif %}
       <div class="summary-md-raw u-hidden" aria-hidden="true">{{ item.content }}</div>
       <div class="summary-content summary-md-rendered"></div>
     </div>
     {% endfor %}
     {% else %}
     <p style="font-size:13px;color:var(--color-text-tertiary);padding:16px 0">
-      サマリーはまだありません。Phase 6 で Ollama によるサマリー生成を実装します。
+      週次・月次のサマリーはまだありません。カレンダーから週・月を選び「この期間で生成」、または <code>./venv/bin/python -m summarizer.generate</code> で作成できます。
     </p>
     {% endif %}
   </div>

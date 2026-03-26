@@ -586,6 +586,23 @@ select {
   line-height: 1.35;
   margin-top: 2px;
 }
+.summary-week-day-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin: 8px 0 10px;
+  font-size: 11px;
+}
+.summary-day-link {
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  border-bottom: 0.5px solid var(--color-border-tertiary);
+  padding-bottom: 1px;
+}
+.summary-day-link:hover {
+  color: var(--color-text-primary);
+  border-bottom-color: var(--color-text-tertiary);
+}
 .summary-panel-body {
   font-size: 13px;
   color: var(--color-text-primary);

@@ -20,6 +20,8 @@ def _message(
         return f"{label} の日次要約を生成中"
     if phase == "daily_skip" and label:
         return f"{label} はログなし（日次スキップ）"
+    if phase == "daily_reuse" and label:
+        return f"{label} の日次要約を再利用（DB 保存済み）"
     if phase == "weekly_merge":
         return "週次サマリーを統合中（日次要約をマージ）"
     if phase == "weekly_flat":
