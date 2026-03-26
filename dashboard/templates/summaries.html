@@ -16,7 +16,10 @@
           {% endif %}
         </span>
         <span class="pill {% if item.period_type == 'weekly' %}pill-week{% endif %}">{{ item.period_type }}</span>
-        {% if item.is_published %}<span class="pill pill-pub">公開済</span>{% endif %}
+        <label class="summary-pub-label">
+          <input type="checkbox" class="summary-pub-toggle" data-id="{{ item.id }}" {% if item.is_published %}checked{% endif %}>
+          Neocities 公開
+        </label>
         <span style="font-size:11px;color:var(--color-text-tertiary);margin-left:auto">{{ item.created_at }}</span>
       </div>
       <div class="summary-content">{{ item.content }}</div>
@@ -29,4 +32,41 @@
     {% endif %}
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const card = document.querySelector('.page .card');
+  if (!card) return;
+  card.addEventListener('change', async (e) => {
+    const t = e.target;
+    if (!t.classList || !t.classList.contains('summary-pub-toggle')) return;
+    const id = t.dataset.id;
+    const on = t.checked;
+    t.disabled = true;
+    try {
+      const r = await fetch('/api/summaries/' + encodeURIComponent(id) + '/publish', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_published: on }),
+      });
+      if (!r.ok) {
+        t.checked = !on;
+        let msg = '更新に失敗しました';
+        try {
+          const j = await r.json();
+          if (j && j.error) msg = j.error;
+        } catch (_) { /* ignore */ }
+        alert(msg);
+      }
+    } catch (_) {
+      t.checked = !on;
+      alert('通信エラーで更新できませんでした');
+    } finally {
+      t.disabled = false;
+    }
+  });
+})();
+</script>
 {% endblock %}

@@ -540,6 +540,99 @@ select {
   overflow: hidden;
 }
 
+/* カレンダー詳細: サマリーパネル（週・月・年） */
+.summary-panel {
+  margin: 0 0 12px;
+  padding: 10px 12px 12px;
+  background: var(--color-background-secondary);
+  border-radius: var(--border-radius-md);
+  border: 0.5px solid var(--color-border-tertiary);
+}
+.summary-panel-head {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin-bottom: 8px;
+}
+.summary-panel-body {
+  font-size: 13px;
+  color: var(--color-text-primary);
+  line-height: 1.5;
+}
+.summary-panel-text {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--color-text-primary);
+}
+.summary-panel-empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-tertiary);
+}
+.summary-year-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.summary-year-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 8px 10px;
+  align-items: start;
+  padding: 8px 10px;
+  background: var(--color-background-primary);
+  border-radius: var(--border-radius-sm);
+  border: 0.5px solid var(--color-border-tertiary);
+}
+.summary-year-month {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+.summary-year-excerpt {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  line-height: 1.4;
+  min-width: 0;
+}
+.summary-year-goto {
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: var(--border-radius-sm);
+  border: 0.5px solid var(--color-border-tertiary);
+  background: var(--color-background-secondary);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.summary-year-goto:hover {
+  border-color: var(--color-text-tertiary);
+}
+
+/* サマリー一覧: 公開トグル */
+.summary-pub-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  margin-left: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+.summary-pub-toggle {
+  margin: 0;
+  cursor: pointer;
+}
+
 /* =========================================================
    FILTER BAR
    ========================================================= */

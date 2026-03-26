@@ -580,6 +580,138 @@ def create_app():
 
         return render_template("summaries.html", items=items)
 
+    def _summary_row_to_api_dict(r):
+        """DB 行 → GET /api/summary 用 JSON（published_at は ISO 文字列）"""
+        pub = r[8]
+        if pub is not None and hasattr(pub, "isoformat"):
+            pub = pub.isoformat()
+        return {
+            "id": r[0],
+            "period_type": r[1],
+            "period_start": str(r[2]),
+            "period_end": str(r[3]),
+            "week_number": r[4],
+            "content": r[5],
+            "model": r[6],
+            "is_published": r[7],
+            "published_at": pub,
+        }
+
+    @app.route("/api/summary")
+    def api_summary():
+        period = (request.args.get("period") or "").strip().lower()
+        date_arg = (request.args.get("date") or "").strip()
+        if period not in ("week", "month", "year") or not date_arg:
+            return jsonify({"error": "period (week|month|year) and date required"}), 400
+
+        conn = get_db_conn()
+        cur = conn.cursor()
+        try:
+            if period == "week":
+                s = date_arg.upper()
+                if "-W" not in s:
+                    return jsonify({"error": "date must be YYYY-Www for week"}), 400
+                y_str, w_str = s.split("-W", 1)
+                y, w = int(y_str), int(w_str)
+                monday = datetime.strptime(f"{y}-{w:02d}-1", "%G-%V-%u").date()
+                cur.execute(
+                    """
+                    SELECT id, period_type, period_start, period_end, week_number,
+                           content, model, is_published, published_at
+                      FROM summaries
+                     WHERE period_type = 'weekly' AND period_start = %s
+                    """,
+                    (monday,),
+                )
+                row = cur.fetchone()
+                return jsonify(
+                    {"summary": _summary_row_to_api_dict(row) if row else None}
+                )
+
+            if period == "month":
+                try:
+                    y, m = map(int, date_arg.split("-", 1))
+                    first = date(y, m, 1)
+                except (ValueError, TypeError):
+                    return jsonify({"error": "date must be YYYY-MM for month"}), 400
+                cur.execute(
+                    """
+                    SELECT id, period_type, period_start, period_end, week_number,
+                           content, model, is_published, published_at
+                      FROM summaries
+                     WHERE period_type = 'monthly' AND period_start = %s
+                    """,
+                    (first,),
+                )
+                row = cur.fetchone()
+                return jsonify(
+                    {"summary": _summary_row_to_api_dict(row) if row else None}
+                )
+
+            # year
+            try:
+                y = int(date_arg)
+            except ValueError:
+                return jsonify({"error": "date must be a year (e.g. 2026)"}), 400
+            start = date(y, 1, 1)
+            end = date(y, 12, 31)
+            cur.execute(
+                """
+                SELECT id, period_type, period_start, period_end, week_number,
+                       content, model, is_published, published_at
+                  FROM summaries
+                 WHERE period_type = 'monthly'
+                   AND period_start >= %s AND period_start <= %s
+                 ORDER BY period_start ASC
+                """,
+                (start, end),
+            )
+            rows = cur.fetchall()
+            return jsonify(
+                {"summaries": [_summary_row_to_api_dict(r) for r in rows]}
+            )
+        finally:
+            cur.close()
+            conn.close()
+
+    @app.route("/api/summaries/<int:sid>/publish", methods=["PATCH"])
+    def api_summaries_publish(sid):
+        data = request.get_json(silent=True) or {}
+        if "is_published" not in data:
+            return jsonify({"error": "is_published required"}), 400
+        val = data["is_published"]
+        if not isinstance(val, bool):
+            return jsonify({"error": "is_published must be boolean"}), 400
+
+        conn = get_db_conn()
+        cur = conn.cursor()
+        try:
+            if val:
+                cur.execute(
+                    """
+                    UPDATE summaries
+                       SET is_published = TRUE, published_at = NOW()
+                     WHERE id = %s
+                    """,
+                    (sid,),
+                )
+            else:
+                cur.execute(
+                    """
+                    UPDATE summaries
+                       SET is_published = FALSE, published_at = NULL
+                     WHERE id = %s
+                    """,
+                    (sid,),
+                )
+            if cur.rowcount == 0:
+                return jsonify({"error": "not found"}), 404
+            conn.commit()
+            return jsonify({"ok": True, "is_published": val})
+        finally:
+            cur.close()
+            conn.close()
+
     # ------------------------------------------------------------------ #
     # 統計
     # ------------------------------------------------------------------ #

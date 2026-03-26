@@ -569,13 +569,16 @@ async function loadWeek(year, week) {
   showFilterBarForTimeline(true);
   const weekStr = `${year}-W${String(week).padStart(2, '0')}`;
   try {
-    const [tl, stats] = await Promise.all([
+    const [tl, stats, sumPayload] = await Promise.all([
       fetchJSON(`/api/timeline?period=week&date=${weekStr}`),
       fetchJSON(`/api/stats?period=week&date=${weekStr}`),
+      fetchSummaryPayload('week', weekStr),
     ]);
     renderStats(stats);
     renderTimeline(tl.entries, 'week');
+    renderSummaryPanelWeekOrMonth('week', sumPayload);
   } catch (e) {
+    hideSummaryPanel();
     showTimelineError(e.message);
   }
 }
@@ -587,13 +590,16 @@ async function loadMonth() {
   showFilterBarForTimeline(true);
   const monthStr = `${cur.year}-${String(cur.month + 1).padStart(2, '0')}`;
   try {
-    const [tl, stats] = await Promise.all([
+    const [tl, stats, sumPayload] = await Promise.all([
       fetchJSON(`/api/timeline?period=month&date=${monthStr}`),
       fetchJSON(`/api/stats?period=month&date=${monthStr}`),
+      fetchSummaryPayload('month', monthStr),
     ]);
     renderStats(stats);
     renderTimeline(tl.entries, 'month');
+    renderSummaryPanelWeekOrMonth('month', sumPayload);
   } catch (e) {
+    hideSummaryPanel();
     showTimelineError(e.message);
   }
 }
@@ -611,7 +617,7 @@ function renderYearTimelinePlaceholder() {
   noItems.style.display = 'none';
   container.innerHTML = `<div class="tl-year-placeholder">
     <p class="tl-year-placeholder-title">投稿一覧は表示していません</p>
-    <p class="tl-year-placeholder-note">年単位では件数が多いためタイムラインを省略しています。今後、サマリー一覧をここに表示する予定です。</p>
+    <p class="tl-year-placeholder-note">年単位では件数が多いためタイムラインを省略しています。月次サマリーは上のパネルを参照してください。</p>
   </div>`;
 }
 
@@ -621,10 +627,15 @@ async function loadYear() {
   clearStats();
   showFilterBarForTimeline(false);
   try {
-    const stats = await fetchJSON(`/api/stats?period=year&date=${cur.year}`);
+    const [stats, sumPayload] = await Promise.all([
+      fetchJSON(`/api/stats?period=year&date=${cur.year}`),
+      fetchSummaryPayload('year', cur.year),
+    ]);
     renderStats(stats);
+    renderSummaryPanelYear(cur.year, sumPayload.summaries);
     renderYearTimelinePlaceholder();
   } catch (e) {
+    hideSummaryPanel();
     showTimelineError(e.message);
   }
 }
@@ -667,7 +678,113 @@ function weatherEmoji(main, desc) {
   return '🌡';
 }
 
+function hideSummaryPanel() {
+  const p = document.getElementById('summary-panel');
+  if (!p) return;
+  p.hidden = true;
+  const head = document.getElementById('summary-panel-head');
+  const body = document.getElementById('summary-panel-body');
+  if (head) head.textContent = '';
+  if (body) body.replaceChildren();
+}
+
+async function fetchSummaryPayload(period, dateStr) {
+  try {
+    const u = `/api/summary?period=${encodeURIComponent(period)}&date=${encodeURIComponent(String(dateStr))}`;
+    return await fetchJSON(u);
+  } catch (_) {
+    return period === 'year' ? { summaries: [] } : { summary: null };
+  }
+}
+
+function renderSummaryPanelWeekOrMonth(kind, payload) {
+  const p = document.getElementById('summary-panel');
+  const head = document.getElementById('summary-panel-head');
+  const body = document.getElementById('summary-panel-body');
+  if (!p || !head || !body) return;
+  p.hidden = false;
+  head.textContent = kind === 'week' ? '週次サマリー' : '月次サマリー';
+  body.replaceChildren();
+  const sum = payload && payload.summary;
+  if (sum && sum.content) {
+    const pre = document.createElement('pre');
+    pre.className = 'summary-panel-text';
+    pre.textContent = sum.content;
+    body.appendChild(pre);
+  } else {
+    const empty = document.createElement('p');
+    empty.className = 'summary-panel-empty';
+    empty.textContent = 'この期間のサマリーはまだありません。';
+    body.appendChild(empty);
+  }
+}
+
+function renderSummaryPanelYear(year, summaries) {
+  const p = document.getElementById('summary-panel');
+  const head = document.getElementById('summary-panel-head');
+  const body = document.getElementById('summary-panel-body');
+  if (!p || !head || !body) return;
+  p.hidden = false;
+  head.textContent = `${year}年の月次サマリー`;
+  body.replaceChildren();
+  const list = Array.isArray(summaries) ? summaries : [];
+  if (!list.length) {
+    const empty = document.createElement('p');
+    empty.className = 'summary-panel-empty';
+    empty.textContent = 'この年の月次サマリーはまだありません。';
+    body.appendChild(empty);
+    return;
+  }
+  const ul = document.createElement('ul');
+  ul.className = 'summary-year-list';
+  for (const s of list) {
+    const li = document.createElement('li');
+    li.className = 'summary-year-item';
+    const ps = s.period_start || '';
+    const parts = ps.split('-');
+    const y = parseInt(parts[0], 10);
+    const mo = parseInt(parts[1], 10) - 1;
+    const label = document.createElement('span');
+    label.className = 'summary-year-month';
+    label.textContent = (!Number.isNaN(y) && !Number.isNaN(mo))
+      ? `${y}年${mo + 1}月`
+      : ps;
+    const excerpt = document.createElement('span');
+    excerpt.className = 'summary-year-excerpt';
+    const raw = (s.content || '').replace(/\s+/g, ' ').trim();
+    excerpt.textContent = raw.length > 100 ? `${raw.slice(0, 100)}…` : raw;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'summary-year-goto';
+    btn.textContent = '月表示へ';
+    btn.addEventListener('click', () => {
+      if (!Number.isNaN(y) && !Number.isNaN(mo)) window.goToMonthFromSummary(y, mo);
+    });
+    li.appendChild(label);
+    li.appendChild(excerpt);
+    li.appendChild(btn);
+    ul.appendChild(li);
+  }
+  body.appendChild(ul);
+}
+
+window.goToMonthFromSummary = function(year, monthIndex) {
+  cur.year = year;
+  cur.month = monthIndex;
+  cur.selDay = null;
+  cur.selWeek = null;
+  cur.viewMode = 'month';
+  setActiveTab('tab-month');
+  syncTabLabel();
+  const selM = document.getElementById('sel-month');
+  const selY = document.getElementById('sel-year');
+  if (selM) selM.value = String(monthIndex);
+  if (selY) selY.value = String(year);
+  void refreshCalWithHeat().then(() => loadMonth());
+};
+
 function clearStats() {
+  hideSummaryPanel();
   ['stat-posts','stat-plays','stat-steps','stat-weather'].forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
