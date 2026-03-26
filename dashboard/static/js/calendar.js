@@ -231,7 +231,19 @@ function buildCal() {
 
       // ヒートマップは当月のみ（他月は h0）
       const rawVal = cell.other ? null : heatByDate[ds];
-      const level  = cell.other ? 0 : heatLevelForValue(rawVal);
+      let level    = 0;
+      if (!cell.other) {
+        // 投稿数・再生曲数: 0 の日はヒートなし（最淡色も付けない）
+        if (
+          (heatMetric === 'posts' || heatMetric === 'plays')
+          && rawVal != null
+          && Number(rawVal) === 0
+        ) {
+          level = 0;
+        } else {
+          level = heatLevelForValue(rawVal);
+        }
+      }
 
       let cls = `day h${level}`;
       if (cell.other) cls += ' other';
