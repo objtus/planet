@@ -5,7 +5,7 @@
 <div class="page">
 
   <!-- カレンダーカード -->
-  <div class="card">
+  <div class="card cal-card cal-heat-posts" id="cal-card">
     <div class="cal-header">
       <div class="date-nav">
         <button onclick="shiftYear(-1)" title="前の年">«</button>
@@ -34,14 +34,22 @@
     </table>
 
     <div class="legend">
-      <span>投稿数</span>
-      <div class="lbox" style="border:0.5px solid rgba(0,0,0,0.12)"></div>
+      <label class="heat-metric-label">
+        <span class="sr-only">ヒートマップの指標</span>
+        <select id="heat-metric" class="heat-metric-select" title="ヒートマップの指標">
+          <option value="posts">投稿数</option>
+          <option value="plays">再生曲数</option>
+          <option value="steps">歩数</option>
+          <option value="weather">最高気温</option>
+        </select>
+      </label>
+      <div class="lbox" style="border:0.5px solid var(--color-border-tertiary)"></div>
       <div class="lbox" style="background:var(--heat-1)"></div>
       <div class="lbox" style="background:var(--heat-2)"></div>
       <div class="lbox" style="background:var(--heat-3)"></div>
       <div class="lbox" style="background:var(--heat-4)"></div>
       <div class="lbox" style="background:var(--heat-5)"></div>
-      <span>少 → 多</span>
+      <span id="heat-legend-axis" class="heat-legend-axis">少 → 多</span>
     </div>
   </div>
 
@@ -110,7 +118,6 @@
 </div>
 
 <script>
-const HEATMAP = {{ heatmap | tojson }};
 const SOURCES = {{ sources | tojson }};
 const TODAY   = "{{ today }}";
 </script>

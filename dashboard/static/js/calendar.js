@@ -1,6 +1,6 @@
 /**
  * Planet Dashboard — calendar.js
- * HEATMAP, SOURCES, TODAY は calendar.html の <script> で定義済み
+ * SOURCES, TODAY は calendar.html の <script> で定義済み
  */
 
 // =========================================================
@@ -25,6 +25,20 @@ let mediaFilter   = false;  // true = メディアあり投稿のみ表示
 
 // タイムラインに実際に表示されている期間のタイトル（カレンダーナビと分離）
 let tlTitle = '';
+
+// カレンダー・ヒートマップ（/api/heatmap、表示月・指標ごと）
+let heatMetric  = 'posts';
+let heatByDate  = {};
+let heatMin     = null;
+let heatMax     = null;
+let heatLoadKey = ''; // `${year}-${month}-${metric}` でキャッシュ一致判定
+
+const HEAT_LEGEND = {
+  posts:   { axis: '少 → 多', suffix: '件' },
+  plays:   { axis: '少 → 多', suffix: '曲' },
+  steps:   { axis: '少 → 多', suffix: '歩' },
+  weather: { axis: '低 → 高（℃）', suffix: '' },
+};
 
 // =========================================================
 // ISO 週番号ユーティリティ
@@ -71,13 +85,71 @@ function dateStr(y, m, d) {
   return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
 }
 
-function heatLevel(count) {
-  if (!count)    return 0;
-  if (count < 3)  return 1;
-  if (count < 10) return 2;
-  if (count < 25) return 3;
-  if (count < 60) return 4;
-  return 5;
+async function fetchJSON(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+/** 月内 min–max で 1…5 段階。欠損は 0 */
+function heatLevelForValue(val) {
+  if (val == null || val === '' || Number.isNaN(Number(val))) return 0;
+  const v = Number(val);
+  if (heatMin == null || heatMax == null) return 0;
+  if (heatMax < heatMin) return 0;
+  if (heatMax === heatMin) return 3;
+  const t       = (v - heatMin) / (heatMax - heatMin);
+  const clamped = Math.max(0, Math.min(1, t));
+  if (clamped >= 1) return 5;
+  return 1 + Math.min(4, Math.floor(clamped * 5));
+}
+
+function formatHeatTitle(ds, rawVal, cellOther) {
+  if (cellOther) return ds;
+  const meta = HEAT_LEGEND[heatMetric];
+  if (rawVal === undefined || rawVal === null) {
+    return `${ds}  データなし`;
+  }
+  if (heatMetric === 'weather') {
+    return `${ds}  ${rawVal}℃`;
+  }
+  return `${ds}  ${Number(rawVal).toLocaleString()}${meta.suffix}`;
+}
+
+async function fetchHeatmapData() {
+  const url = `/api/heatmap?year=${cur.year}&month=${cur.month + 1}&metric=${encodeURIComponent(heatMetric)}`;
+  let data;
+  try {
+    data = await fetchJSON(url);
+  } catch (e) {
+    heatByDate = {};
+    heatMin    = null;
+    heatMax    = null;
+    throw e;
+  }
+  heatByDate  = data.by_date || {};
+  heatMin     = data.min;
+  heatMax     = data.max;
+  const card  = document.getElementById('cal-card');
+  if (card) {
+    card.classList.remove('cal-heat-posts', 'cal-heat-plays', 'cal-heat-steps', 'cal-heat-weather');
+    card.classList.add('cal-heat-' + (data.metric || heatMetric));
+  }
+  const ax = document.getElementById('heat-legend-axis');
+  const lg = HEAT_LEGEND[data.metric || heatMetric];
+  if (ax && lg) ax.textContent = lg.axis;
+}
+
+async function ensureHeatmapForView() {
+  const key = `${cur.year}-${cur.month}-${heatMetric}`;
+  if (key === heatLoadKey) return;
+  await fetchHeatmapData();
+  heatLoadKey = key;
+}
+
+async function refreshCalWithHeat() {
+  await ensureHeatmapForView();
+  buildCal();
 }
 
 // =========================================================
@@ -157,16 +229,16 @@ function buildCal() {
       // 選択状態は当月のみ（他月の同じ日番号を誤ってハイライトしない）
       const isSel   = !cell.other && cur.viewMode === 'day' && cell.d === cur.selDay;
 
-      // ヒートマップは当月のみ表示（他月は常に h0 で無色）
-      const level = cell.other ? 0 : heatLevel(HEATMAP[ds] ?? 0);
-      const count = cell.other ? 0 : (HEATMAP[ds] ?? 0);
+      // ヒートマップは当月のみ（他月は h0）
+      const rawVal = cell.other ? null : heatByDate[ds];
+      const level  = cell.other ? 0 : heatLevelForValue(rawVal);
 
       let cls = `day h${level}`;
       if (cell.other) cls += ' other';
       if (isToday)    cls += ' today';
       if (isSel)      cls += ' selected';
 
-      const title = cell.other ? ds : `${ds}  ${count}件`;
+      const title = formatHeatTitle(ds, rawVal, cell.other);
       td.innerHTML = `<div class="${cls}" title="${title}">${cell.d}</div>`;
       td.querySelector('.day').addEventListener(
         'click',
@@ -202,8 +274,7 @@ function goCalMonth() {
   cur.viewMode = 'month';
   setActiveTab('tab-month');
   syncTabLabel();
-  buildCal();
-  loadMonth();
+  void refreshCalWithHeat().then(() => loadMonth());
 }
 
 /** カレンダーヘッダーの「N年」ボタン用。 */
@@ -213,8 +284,7 @@ function goCalYear() {
   cur.viewMode = 'year';
   setActiveTab('tab-year');
   syncTabLabel();
-  buildCal();
-  loadYear();
+  void refreshCalWithHeat().then(() => loadYear());
 }
 
 // =========================================================
@@ -241,8 +311,7 @@ function selectOtherDay(year, month, day) {
   cur.viewMode = 'day';
   syncTabLabel();
   setActiveTab('tab-day');
-  buildCal();
-  loadDay();
+  void refreshCalWithHeat().then(() => loadDay());
 }
 
 /** カレンダーの週番号ボタンをクリック */
@@ -293,8 +362,9 @@ function setViewMode(mode) {
     cur.viewMode = 'week';
     setActiveTab('tab-week');
     syncTabLabel();
-    buildCal();
-    if (cur.selWeek) loadWeek(cur.selWeek.year, cur.selWeek.week);
+    void refreshCalWithHeat().then(() => {
+      if (cur.selWeek) loadWeek(cur.selWeek.year, cur.selWeek.week);
+    });
 
   } else if (mode === 'month') {
     if (prev === 'week' && cur.selWeek) {
@@ -310,8 +380,7 @@ function setViewMode(mode) {
     cur.viewMode = 'month';
     setActiveTab('tab-month');
     syncTabLabel();
-    buildCal();
-    loadMonth();
+    void refreshCalWithHeat().then(() => loadMonth());
 
   } else if (mode === 'year') {
     // どこからでも: cur.year は維持
@@ -320,8 +389,7 @@ function setViewMode(mode) {
     cur.viewMode = 'year';
     setActiveTab('tab-year');
     syncTabLabel();
-    buildCal();
-    loadYear();
+    void refreshCalWithHeat().then(() => loadYear());
 
   // ---- 縮小方向 ------------------------------------------------
   } else if (mode === 'day') {
@@ -341,8 +409,7 @@ function setViewMode(mode) {
     cur.viewMode = 'day';
     setActiveTab('tab-day');
     syncTabLabel();
-    buildCal();
-    loadDay();
+    void refreshCalWithHeat().then(() => loadDay());
   }
 }
 
@@ -385,9 +452,12 @@ function shiftMonth(n) {
   cur.month += n;
   if (cur.month < 0)  { cur.month = 11; cur.year--; }
   if (cur.month > 11) { cur.month = 0;  cur.year++; }
-  buildCal();
+  void refreshCalWithHeat();
 }
-function shiftYear(n) { cur.year += n; buildCal(); }
+function shiftYear(n) {
+  cur.year += n;
+  void refreshCalWithHeat();
+}
 
 /**
  * view-tabs の ‹ / › ボタン。現在の viewMode に応じて前後の単位へ移動する。
@@ -402,8 +472,7 @@ function shiftView(n) {
     cur.selDay = d.getDate();
     cur.selWeek = null;
     syncTabLabel();
-    buildCal();
-    loadDay();
+    void refreshCalWithHeat().then(() => loadDay());
 
   } else if (cur.viewMode === 'week') {
     // 前週 / 次週
@@ -415,22 +484,20 @@ function shiftView(n) {
     cur.month    = nextMon.getMonth();
     cur.selDay   = null;
     syncTabLabel();
-    buildCal();
-    loadWeek(cur.selWeek.year, cur.selWeek.week);
+    void refreshCalWithHeat().then(() =>
+      loadWeek(cur.selWeek.year, cur.selWeek.week));
 
   } else if (cur.viewMode === 'month') {
     // 先月 / 次の月
     cur.month += n;
     if (cur.month < 0)  { cur.month = 11; cur.year--; }
     if (cur.month > 11) { cur.month = 0;  cur.year++; }
-    buildCal();
-    loadMonth();
+    void refreshCalWithHeat().then(() => loadMonth());
 
   } else if (cur.viewMode === 'year') {
     // 前年 / 次の年
     cur.year += n;
-    buildCal();
-    loadYear();
+    void refreshCalWithHeat().then(() => loadYear());
   }
 }
 
@@ -442,25 +509,18 @@ function goToday() {
   };
   setActiveTab('tab-day');
   syncTabLabel();
-  buildCal();
-  loadDay();
+  void refreshCalWithHeat().then(() => loadDay());
 }
 
 function onSelChange() {
   cur.month = parseInt(document.getElementById('sel-month').value);
   cur.year  = parseInt(document.getElementById('sel-year').value);
-  buildCal();
+  void refreshCalWithHeat();
 }
 
 // =========================================================
 // データ取得
 // =========================================================
-
-async function fetchJSON(url) {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
-}
 
 function showTimelineLoading() {
   document.getElementById('timeline').innerHTML =
@@ -1078,5 +1138,15 @@ function buildFilterBar() {
 // =========================================================
 
 buildFilterBar();
-buildCal();
-loadDay();
+{
+  const hm = document.getElementById('heat-metric');
+  if (hm) {
+    heatMetric = hm.value || 'posts';
+    hm.addEventListener('change', () => {
+      heatMetric = hm.value;
+      heatLoadKey = '';
+      void refreshCalWithHeat();
+    });
+  }
+}
+void refreshCalWithHeat().then(() => loadDay());

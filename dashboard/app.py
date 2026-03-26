@@ -3,10 +3,11 @@
 import os
 import sys
 import subprocess
+from calendar import monthrange
 import tomllib
 import psycopg2
 from pathlib import Path
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, date
 
 from flask import Flask, render_template, request, jsonify
 
@@ -118,15 +119,6 @@ def create_app():
         conn = get_db_conn()
         cur  = conn.cursor()
         try:
-            # 全期間の日別投稿数（ヒートマップ用）
-            cur.execute("""
-                SELECT DATE(timestamp AT TIME ZONE 'Asia/Tokyo') AS d, COUNT(*)
-                  FROM logs
-                 WHERE is_deleted = FALSE
-                 GROUP BY d
-            """)
-            heatmap = {str(r[0]): r[1] for r in cur.fetchall()}
-
             # 全ソース（廃止含む）— タイムライン中の過去エントリのバッジ表示に必要
             cur.execute("""
                 SELECT id, name, type, base_url, account, is_active, sort_order, short_name
@@ -136,8 +128,119 @@ def create_app():
             sources = [make_source_info(r) for r in cur.fetchall()]
 
             today = datetime.now(JST).date()
-            return render_template("calendar.html",
-                heatmap=heatmap, sources=sources, today=str(today))
+            return render_template("calendar.html", sources=sources, today=str(today))
+        finally:
+            cur.close(); conn.close()
+
+    # ------------------------------------------------------------------ #
+    # API: カレンダー・ヒートマップ（月内スケール・指標別）
+    # ------------------------------------------------------------------ #
+    @app.route("/api/heatmap")
+    def api_heatmap():
+        try:
+            y = int(request.args.get("year", 0))
+            m = int(request.args.get("month", 0))
+        except (TypeError, ValueError):
+            return jsonify({"error": "invalid year/month"}), 400
+        metric = (request.args.get("metric") or "posts").lower()
+        if m < 1 or m > 12 or y < 1990 or y > 2100:
+            return jsonify({"error": "invalid year/month"}), 400
+        if metric not in ("posts", "plays", "steps", "weather"):
+            return jsonify({"error": "invalid metric"}), 400
+
+        month_start = date(y, m, 1)
+        last_d      = monthrange(y, m)[1]
+        month_end   = date(y, m, last_d)
+        jst         = "AT TIME ZONE 'Asia/Tokyo'"
+
+        conn = get_db_conn()
+        cur  = conn.cursor()
+        try:
+            if metric == "posts":
+                cur.execute(
+                    f"""
+                    SELECT DATE(l.timestamp {jst}) AS d, COUNT(*)::bigint
+                      FROM logs l
+                      JOIN data_sources ds ON ds.id = l.source_id
+                     WHERE l.is_deleted = FALSE
+                       AND ds.type IN ('misskey', 'mastodon', 'rss', 'youtube')
+                       AND DATE(l.timestamp {jst}) >= %s
+                       AND DATE(l.timestamp {jst}) <= %s
+                     GROUP BY 1
+                    """,
+                    (month_start, month_end),
+                )
+                raw = {str(r[0]): int(r[1]) for r in cur.fetchall()}
+                by_date = {}
+                for dom in range(1, last_d + 1):
+                    ds = str(date(y, m, dom))
+                    by_date[ds] = float(raw.get(ds, 0))
+
+            elif metric == "plays":
+                cur.execute(
+                    f"""
+                    SELECT DATE(l.timestamp {jst}) AS d, COUNT(*)::bigint
+                      FROM logs l
+                      JOIN data_sources ds ON ds.id = l.source_id
+                     WHERE l.is_deleted = FALSE
+                       AND ds.type = 'lastfm'
+                       AND DATE(l.timestamp {jst}) >= %s
+                       AND DATE(l.timestamp {jst}) <= %s
+                     GROUP BY 1
+                    """,
+                    (month_start, month_end),
+                )
+                raw = {str(r[0]): int(r[1]) for r in cur.fetchall()}
+                by_date = {}
+                for dom in range(1, last_d + 1):
+                    ds = str(date(y, m, dom))
+                    by_date[ds] = float(raw.get(ds, 0))
+
+            elif metric == "steps":
+                cur.execute(
+                    """
+                    SELECT date, steps
+                      FROM health_daily
+                     WHERE date >= %s AND date <= %s
+                    """,
+                    (month_start, month_end),
+                )
+                by_date = {}
+                for r in cur.fetchall():
+                    if r[1] is not None:
+                        by_date[str(r[0])] = float(int(r[1]))
+
+            else:  # weather
+                cur.execute(
+                    """
+                    SELECT date, temp_max
+                      FROM weather_daily
+                     WHERE date >= %s AND date <= %s
+                       AND temp_max IS NOT NULL
+                    """,
+                    (month_start, month_end),
+                )
+                by_date = {}
+                for r in cur.fetchall():
+                    by_date[str(r[0])] = float(r[1])
+
+            vals = list(by_date.values())
+            if not vals:
+                hmin, hmax = None, None
+            else:
+                hmin = min(vals)
+                hmax = max(vals)
+
+            return jsonify(
+                {
+                    "metric":   metric,
+                    "year":     y,
+                    "month":    m,
+                    "by_date":  by_date,
+                    "min":      hmin,
+                    "max":      hmax,
+                }
+            )
         finally:
             cur.close(); conn.close()
 

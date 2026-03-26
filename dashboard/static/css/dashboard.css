@@ -5,6 +5,18 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 :root {
   --font-sans: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
 
@@ -59,6 +71,35 @@
     --heat-3: #26a641;
     --heat-4: #39d353;
     --heat-5: #39d353;
+  }
+
+  .cal-card.cal-heat-posts {
+    --heat-1: #0e4429;
+    --heat-2: #006d32;
+    --heat-3: #26a641;
+    --heat-4: #39d353;
+    --heat-5: #2ea043;
+  }
+  .cal-card.cal-heat-plays {
+    --heat-1: #2d1b36;
+    --heat-2: #5b2d6b;
+    --heat-3: #8957a0;
+    --heat-4: #a371f7;
+    --heat-5: #d8b4fe;
+  }
+  .cal-card.cal-heat-steps {
+    --heat-1: #0d2818;
+    --heat-2: #14532d;
+    --heat-3: #166534;
+    --heat-4: #22c55e;
+    --heat-5: #4ade80;
+  }
+  .cal-card.cal-heat-weather {
+    --heat-1: #431407;
+    --heat-2: #7c2d12;
+    --heat-3: #c2410c;
+    --heat-4: #fb923c;
+    --heat-5: #fcd34d;
   }
 }
 
@@ -283,14 +324,81 @@ select {
 .h4 { background: var(--heat-4); color: #fff; }
 .h5 { background: var(--heat-5); color: #fff; }
 
+/* 薄い段の背景でも日付が読めるよう文字を濃く（ライト: 紺黒 / ダーク: 明るい灰） */
+@media (prefers-color-scheme: light) {
+  .cal-grid .day.h1,
+  .cal-grid .day.h2,
+  .cal-grid .day.h3 {
+    color: #0a1628;
+    font-weight: 600;
+  }
+  /* .today の情報色は淡いヒート上ではコントラスト不足になりやすい */
+  .cal-grid .day.today.h1,
+  .cal-grid .day.today.h2,
+  .cal-grid .day.today.h3 {
+    color: #062a52;
+    font-weight: 600;
+  }
+}
+@media (prefers-color-scheme: dark) {
+  .cal-grid .day.h1,
+  .cal-grid .day.h2{
+    color: #8094a7;
+    font-weight: 600;
+  }
+  .cal-grid .day.today.h1,
+  .cal-grid .day.today.h2{
+    color: #e6f1ff;
+    font-weight: 600;
+  }
+}
+
 /* 凡例 */
 .legend {
   display: flex;
   align-items: center;
-  gap: 6px;
+  flex-wrap: wrap;
+  gap: 6px 8px;
   margin: 8px 0 0 46px;
 }
 .legend span { font-size: 10px; color: var(--color-text-tertiary); }
+.heat-metric-label { display: inline-flex; align-items: center; }
+.heat-metric-select {
+  font-size: 11px;
+  padding: 4px 8px;
+  max-width: 9.5rem;
+}
+.heat-legend-axis { white-space: nowrap; }
+
+/* ヒート指標別パレット（.cal-card に cal-heat-* を付与） */
+.cal-card.cal-heat-posts {
+  --heat-1: #E6F1FB;
+  --heat-2: #B5D4F4;
+  --heat-3: #85B7EB;
+  --heat-4: #378ADD;
+  --heat-5: #185FA5;
+}
+.cal-card.cal-heat-plays {
+  --heat-1: #faf5ff;
+  --heat-2: #e9d5ff;
+  --heat-3: #c084fc;
+  --heat-4: #9333ea;
+  --heat-5: #6b21a8;
+}
+.cal-card.cal-heat-steps {
+  --heat-1: #ecfdf5;
+  --heat-2: #a7f3d0;
+  --heat-3: #34d399;
+  --heat-4: #059669;
+  --heat-5: #065f46;
+}
+.cal-card.cal-heat-weather {
+  --heat-1: #fffbeb;
+  --heat-2: #fde68a;
+  --heat-3: #fbbf24;
+  --heat-4: #f59e0b;
+  --heat-5: #d97706;
+}
 .lbox {
   width: 12px; height: 12px;
   border-radius: 3px;
