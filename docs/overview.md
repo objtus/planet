@@ -95,3 +95,5 @@ planet/
 ## 次のタスク
 
 → `docs/next_tasks.md` を参照
+
+Phase 6（AI 生成・Neocities）の実装手順 → **`docs/phase6_plan.md`**

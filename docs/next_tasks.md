@@ -12,56 +12,46 @@
 | 2 | 過去データインポート | 完了 |
 | 3 | 自動収集 | 完了 |
 | 4 | iPhone連携 | 完了 |
-| 5 | ダッシュボード | **実装中**（細部・追加機能あり） |
-| 6 | AI生成・公開 | 未着手 |
+| 5 | ダッシュボード | **完了**（コア機能。細部の UI は任意で継続改善） |
+| 6 | AI生成・公開 | **計画策定済み** → `docs/phase6_plan.md` |
 | 7 | 自動化・バックアップ | 未着手 |
 
 ---
 
-## Phase 5: ダッシュボード
-
-### 実装済み（要点）
+## Phase 5: ダッシュボード（完了・要点）
 
 - **カレンダー**: 月グリッド、前後月の薄表示、週番号、今日、右上から月/年タイムラインへ
-- **ヒートマップ**: `GET /api/heatmap`（`posts` / `plays` / `steps` / `weather`）。**月内 min–max** の5段、指標ごとに色相。凡例付近の `<select>` で切替。投稿数・再生曲数は **0 の日は背景なし**
+- **ヒートマップ**: `GET /api/heatmap`（`posts` / `plays` / `steps` / `weather`）。月内 min–max の5段、指標ごとに色相
 - **タイムライン**: 新着順、メディア・ライトボックス、フィルター、ソースバッジソロ
-- **見出し**: `detail-title` は読み込んだ期間のみ（カレンダー `«‹›»` と独立）。日=年月日、週=年・週番号・日付範囲
-- **統計カード・統計ページ**: Chart.js ローカル、月別/年別切替、週は7日天気ストリップ、天気絵文字
-- **年ビュー**: 投稿一覧は取得しない（軽量化）。サマリー表示は今後
+- **統計カード・統計ページ**: Chart.js ローカル、月別/年別切替、週は7日天気ストリップ
+- **年ビュー**: 投稿一覧は取得しない。**月次サマリー一覧**は `#summary-panel` で表示（タイムラインはプレースホルダ）
+- **サマリー連携（Phase 6 前提）**: `PATCH /api/summaries/<id>/publish`、`GET /api/summary`（`period=week|month|year`）、`/summaries` の公開トグル、カレンダー週/月/年でのパネル表示（`docs/summary_integration_plan.md`）
 - **ソース管理**: 並べ替え、略称、`POST /api/collect/<stype>`
-- **その他**: favicon、名古屋天気・過去バックフィル、iPhone ingest 時刻 等（詳細は `current_state.md`）
 
-### 残タスク（優先順）
+### Phase 5 で後回しにしたもの（優先度低・任意）
 
-**次に進める: サマリー整備（Phase 5 → 6 の土台）**
-
-手順・データ契約・API の詳細は **`docs/summary_integration_plan.md`** を参照。
-
-1. **`is_published` 公開トグル API** + `/summaries` 一覧から操作できる UI
-2. **`GET /api/summary`（任意だが推奨）** — 週・月単位で 1 件取得、カレンダーと SQL 共通化
-3. **カレンダー**: 週/月ビューにサマリーパネル（`stat-row` 下〜タイムライン上）。年ビューは月次サマリーの一覧（投稿一覧は引き続き省略）
-
-**UI・デザイン（並行でよい）**
-
-- `mockup/calender_v3.html` との差分整理
-- モバイル（iPhone）レイアウト確認
+- `mockup/calender_v3.html` との完全一致、iPhone 幅でのレイアウト詰め → 必要になったときに着手でよい
 
 ### 参考ドキュメント
 
-- **`docs/summary_integration_plan.md`** — サマリー連携の実装計画
-- `docs/dashboard_ui.md` — UI 仕様
-- `docs/design.md` Section 6–8 — 画面・サマリー生成・公開
-- `mockup/calender_v3.html` — モックアップ
+- **`docs/summary_integration_plan.md`** — サマリー連携（実装済みの契約・経緯）
+- **`docs/dashboard_ui.md`** — UI 仕様
+- **`docs/design.md`** Section 6–8 — 画面・サマリー生成・公開
 
 ---
 
-## Phase 6: AI生成・公開
+## Phase 6: AI生成・公開（詳細は phase6_plan）
 
-1. Ollama サマリー（`summarizer/generate.py`）
+**マスタープラン: [`docs/phase6_plan.md`](phase6_plan.md)**（マイルストーン M1〜M6、データ契約、完了定義）
+
+概要:
+
+1. Ollama サマリー（`summarizer/generate.py`）— **週次 1 本から**
 2. プロンプト（`summarizer/prompts/`）
-3. 過去分一括生成
-4. Neocities HTML テンプレート
-5. Neocities アップロード（`publisher/`）
+3. 過去分一括生成（バッチ）
+4. Neocities HTML テンプレート + アップロード（`publisher/`）
+5. Planet ページ HTML 生成（`design.md` ロードマップ項 31）
+6. cron は最小追記 → 本格整理は Phase 7
 
 ---
 
@@ -75,13 +65,13 @@
 
 ## バックログ（低優先・アイデア）
 
-- **ソース管理: 新規追加フォーム**（種別でフィールド切替・接続テスト等）— 現状必要性低。ソース追加は DB / 設定直編集で十分な期間は後回し
-- **年全体カレンダー一覧**: 12ヶ月同時表示や年単位スケールのヒート等。要件・パフォーマンスは未整理
-- **検索の高速化（任意）**: 現状は `content LIKE '%…%'` で問題なし。ログがさらに増えて遅くなったときなど、`pg_bigm` + 既存 `gin_bigm_ops` GIN を活かす書き方へ切替を検討（着手タイミングは `EXPLAIN` や体感で判断）
+- **ソース管理: 新規追加フォーム**（種別でフィールド切替・接続テスト等）
+- **年全体カレンダー一覧**: 12ヶ月同時表示や年単位スケールのヒート等
+- **検索の高速化（任意）**: `pg_bigm` + GIN を活かす書き方へ切替（`EXPLAIN` や体感で判断）
 
 ---
 
-## 運用メモ・小タスク
+## 運用メモ・優先度低（いずれも着手タイミングは任意）
 
 - YouTube Data API v3 取得 → `collectors/youtube.py` 有効化
 - mastodon.cloud @objtus 収集不調の原因調査
@@ -103,4 +93,6 @@
 
 **最初に読む:** `overview.md` → `current_state.md` → **このファイル**
 
-**必要に応じて:** `design.md`, `dashboard_ui.md`, `summary_integration_plan.md`, `iphone_shortcuts.md`, `importers.md`, `docs/api/*.md`
+**Phase 6 実装時:** **`docs/phase6_plan.md`** → `design.md` §7–8、`summary_integration_plan.md`
+
+**必要に応じて:** `dashboard_ui.md`, `iphone_shortcuts.md`, `importers.md`, `docs/api/*.md`

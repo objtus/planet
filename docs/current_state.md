@@ -1,6 +1,6 @@
 # 現在の実装状況
 
-**最終更新**: 2026-03-26（Phase 5 実装中）
+**最終更新**: 2026-03-26（Phase 5 完了・Phase 6 計画反映）
 
 ---
 
@@ -97,7 +97,13 @@
 
 ## 進行中
 
-### Phase 5: ダッシュボード（実装中・デザイン調整中）
+### Phase 6: AI生成・公開（未着手・計画あり）
+
+- [ ] 実装は **`docs/phase6_plan.md`** のマイルストーンに従う（週次 CLI → 月次 → バッチ → Neocities → Planet ページ）
+
+---
+
+### Phase 5: ダッシュボード（完了）
 
 #### 完了済み（Phase 5）
 
@@ -113,6 +119,8 @@
   - `POST /sources/<id>/move` — `{"direction":"up"|"down"}` で `sort_order` 入れ替え
   - `POST /sources/<id>/rename` — `{"short_name":"..."}` で略称更新
   - `POST /api/collect/<stype>` — 収集スクリプトをサブプロセス実行（`stype` は種別名または `all`）。`PYTHONPATH` にリポジトリルートを付与
+  - `GET /api/summary` — `period=week|month|year` と `date`（週は `YYYY-Www`、月は `YYYY-MM`、年は西暦）。週・月は 1 件 or null、年は月次サマリー配列
+  - `PATCH /api/summaries/<id>/publish` — JSON `{"is_published": bool}`、`published_at` 連動
 - [x] `dashboard/static/css/dashboard.css`（CSS変数ベース・ライト/ダーク自動切替）
 - [x] `dashboard/static/js/calendar.js`（カレンダーロジック全体・フィルター・タイムライン描画）
 - [x] `dashboard/templates/base.html`（ナビ・共通レイアウト）
@@ -136,6 +144,11 @@
 - [x] 今日ボタン
 - [x] カレンダー右上: 現在表示中の「○月」「○年」ボタンで月/年タイムラインへ（`goCalMonth` / `goCalYear`。カレンダー上の月は維持。view-tabs の年→月で1月へ落ちる挙動とは別経路）
 - [x] タイムライン見出し `#detail-title`: **表示中タイムラインの期間**のみ表示。`calendar.js` の `tlTitle` + `setTlTitle()` で保持し、`buildCal()` 内の `updateDetailTitle()` は復元のみ（カレンダーの `«‹›»` ナビと表示内容を分離）
+
+**サマリー（カレンダー・一覧・API）**
+- [x] 週・月ビュー: `stat-row` と週天気帯の下・フィルターバー上の `#summary-panel` で `GET /api/summary` の本文を表示（`textContent` で XSS 回避）
+- [x] 年ビュー: 同パネルで年内の月次サマリー一覧、「月表示へ」で月ビューへ遷移
+- [x] `/summaries`: Neocities 公開チェックボックス + `PATCH .../publish`
 
 **タイムライン**
 - [x] 新着順表示（最新が上）
@@ -182,29 +195,16 @@
 - [x] OpenWeatherMap 取得地点: `config/settings.toml` の `lat` / `lon` / `location` を名古屋（愛知）に変更
 - [x] 過去天気バックフィル: `db/backfill_weather.py` — Open-Meteo 履歴を `weather_daily` と `logs` に投入可能（運用は手動実行）
 
-#### 残タスク（Phase 5）
+#### Phase 5 で任意・低優先に回したもの
 
-**優先（サマリー整備 → Phase 6 接続）** — 手順は `docs/summary_integration_plan.md`
-
-- [ ] サマリー: `is_published` 更新 API + `/summaries` からトグル UI
-- [ ] （推奨）`GET /api/summary` で週・月単位の 1 件取得
-- [ ] カレンダー: 週/月ビューにサマリーパネル。年ビューは月次サマリー一覧（`summaries`）
-
-**その他**
-
-- [ ] デザイン・UI の細部調整（mockup/calender_v3.html との差分修正）
-
-**バックログ（必要性低）**
-
-- ソース管理: 新規追加フォーム → `docs/next_tasks.md` バックログ参照
-
-検索（`/search`）は現状 `LIKE` 部分一致で十分な速度のため、**pg_bigm / GIN を活かす書き方への切替は優先度低・任意**（ログ増加で遅くなった場合などに検討。`docs/next_tasks.md` のバックログ参照）。
+- mockup とのピクセル級の差分、モバイル幅の細かい詰め → 必要時に `docs/next_tasks.md` 参照
+- 検索（`/search`）の `pg_bigm` / GIN 最適化はログ増加後に検討（`next_tasks.md` バックログ）
 
 ---
 
 ## 未着手
 
-- [ ] Phase 6: AI生成・公開
+- [ ] Phase 6: AI生成・公開（**手順書**: `docs/phase6_plan.md`）
 - [ ] Phase 7: 自動化・バックアップ
 
 ---
@@ -276,6 +276,8 @@ planet/
 │   ├── overview.md
 │   ├── current_state.md        # このファイル
 │   ├── next_tasks.md
+│   ├── phase6_plan.md          # Phase 6 実装プラン（AI・Neocities）
+│   ├── summary_integration_plan.md
 │   ├── design.md
 │   ├── dashboard_ui.md
 │   ├── decisions.md
