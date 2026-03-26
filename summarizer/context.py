@@ -9,12 +9,19 @@ from datetime import datetime, timezone
 
 from summarizer.week_bounds import JST
 
-# M1: 固定上限。肥大化したら設計見直し。
+# 固定上限。肥大化したら設計見直し（phase6_plan M2）。
 MAX_LOG_LINES = 2000
+MAX_LOG_LINES_MONTHLY = 8000
 CONTENT_PREVIEW_CHARS = 500
 
 
-def fetch_activity_digest(conn, start_utc: datetime, end_utc: datetime) -> str:
+def fetch_activity_digest(
+    conn,
+    start_utc: datetime,
+    end_utc: datetime,
+    *,
+    max_lines: int = MAX_LOG_LINES,
+) -> str:
     """指定期間のログを 1 行ずつ連結した文字列。0 件なら空文字。"""
     sql = """
         SELECT id, source_id, content, timestamp
@@ -26,7 +33,7 @@ def fetch_activity_digest(conn, start_utc: datetime, end_utc: datetime) -> str:
          LIMIT %s
     """
     with conn.cursor() as cur:
-        cur.execute(sql, (start_utc, end_utc, MAX_LOG_LINES))
+        cur.execute(sql, (start_utc, end_utc, max_lines))
         rows = list(reversed(cur.fetchall()))
 
     lines = []

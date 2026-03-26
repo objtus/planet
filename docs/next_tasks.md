@@ -13,7 +13,7 @@
 | 3 | 自動収集 | 完了 |
 | 4 | iPhone連携 | 完了 |
 | 5 | ダッシュボード | **完了**（コア機能。細部の UI は任意で継続改善） |
-| 6 | AI生成・公開 | **着手**（M1 週次 CLI 実装済み）→ `docs/phase6_plan.md` |
+| 6 | AI生成・公開 | **着手**（M1 週・M2 月 CLI 実装済み）→ `docs/phase6_plan.md` |
 | 7 | 自動化・バックアップ | 未着手 |
 
 ---
@@ -47,7 +47,7 @@
 概要:
 
 1. ~~Ollama サマリー（`summarizer/generate.py`）— 週次 CLI~~ **M1 済**: `./venv/bin/python -m summarizer.generate --period week --date YYYY-Www`
-2. **月次 CLI（M2）** — タスク分解・実行例は **`docs/phase6_plan.md` の「M2 — 月次パイプライン」**。プロンプトは `summarizer/prompts/monthly_hybrid.txt`（未作成）
+2. ~~**月次 CLI（M2）**~~ **済**: `./venv/bin/python -m summarizer.generate --period month --date YYYY-MM`（詳細は `phase6_plan.md`）
 3. 過去分一括生成（バッチ）
 4. Neocities HTML テンプレート + アップロード（`publisher/`）
 5. Planet ページ HTML 生成（`design.md` ロードマップ項 31）

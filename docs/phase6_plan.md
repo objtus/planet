@@ -91,6 +91,8 @@
 
 ### M2 — 月次パイプライン
 
+**実装済み（2026-03-26）**: `summarizer/month_bounds.py`、`prompts/monthly_hybrid.txt`、`generate.py` の `--period month`、`fetch_activity_digest(..., max_lines=8000)`（`context.MAX_LOG_LINES_MONTHLY`）。
+
 目的: 手動コマンド 1 回で「指定した暦月」の `monthly` 行が `summaries` に入り、**カレンダー月ビュー**と **`GET /api/summary?period=month&date=YYYY-MM`**・`/summaries` と整合する。
 
 #### M2 と M1 の関係（再利用）
@@ -99,8 +101,8 @@
 |------|----------------|
 | `summarizer/db.py` / `load_config` / `get_conn` | そのまま |
 | `summarizer/ollama_client.py` | そのまま |
-| `summarizer/context.fetch_activity_digest(conn, start_utc, end_utc)` | **そのまま**（引数の UTC 範囲だけ「月の JST 窓」に変える） |
-| 件数上限（`MAX_LOG_LINES` 等） | 月はログ量が週の約 4 倍。**同じ上限のまま**なら「直近 K 件」が月の後半に偏る。M2 では上限を月用に上げるか、v1 は週と同じにしてコメントで明示し、M3 以降で調整してよい |
+| `summarizer/context.fetch_activity_digest` | キーワード `max_lines` を追加。月次は **`MAX_LOG_LINES_MONTHLY`（8000）**、週次は従来 **2000** |
+| 件数上限 | 実装: 月は 8000 件・週は 2000 件（直近優先の偏りを緩和） |
 | 週次の `finalize_weekly_markdown` / 先頭 `#`・`##` 剥がし | **月次用に同等の関数**を追加（例: `## 月次サマリー（…）` を機械付与。モデルに H2 を書かせない） |
 
 #### M2 で新規に必要なもの
@@ -213,7 +215,7 @@
 
 ## 7. Phase 6 完了の定義（提案）
 
-- [ ] 週次・月次の CLI 生成が動作し、ダッシュボードに反映される  
+- [x] 週次・月次の CLI 生成が動作し、ダッシュボードに反映される  
 - [ ] 過去分をまとめて回せるバッチがある（オプション引数で上書き制御）  
 - [ ] `is_published` が ON のサマリーが Neocities にアップロードされる  
 - [ ] Planet ページ生成が設計どおり動く（または「後続タスク」として明示的に切り出し）  

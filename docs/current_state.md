@@ -99,8 +99,9 @@
 
 ### Phase 6: AI生成・公開（着手済み・計画あり）
 
-- [x] **M1（週次 1 本）**: `./venv/bin/python -m summarizer.generate --period week --date YYYY-Www` — `summarizer/`、`config/settings.toml` の `[ollama]`（venv 必須: `psycopg2`）。詳細は **`docs/phase6_plan.md`**
-- [ ] M2 以降（月次・バッチ・Neocities・Planet ページ）は同ファイルのマイルストーンに従う
+- [x] **M1（週次）**: `./venv/bin/python -m summarizer.generate --period week --date YYYY-Www`
+- [x] **M2（月次）**: `./venv/bin/python -m summarizer.generate --period month --date YYYY-MM` — `month_bounds.py`、`monthly_hybrid.txt`、ログ上限 8000 件/月
+- [ ] M3 以降（バッチ・Neocities・Planet ページ）は **`docs/phase6_plan.md`** のマイルストーンに従う
 
 ---
 
@@ -205,7 +206,7 @@
 
 ## 未着手
 
-- [ ] Phase 6: 残り（月次・一括・Neocities 等。**手順書**: `docs/phase6_plan.md`）
+- [ ] Phase 6: 残り（一括・Neocities 等。**手順書**: `docs/phase6_plan.md`）
 - [ ] Phase 7: 自動化・バックアップ
 
 ---
@@ -251,9 +252,9 @@ planet/
 ├── ingest/
 │   └── api.py                  # Flask Blueprint（dashboard に統合済み）
 ├── summarizer/
-│   ├── generate.py             # 週次サマリー CLI（Ollama → summaries UPSERT）
-│   ├── db.py, context.py, week_bounds.py, ollama_client.py
-│   └── prompts/weekly_hybrid.txt
+│   ├── generate.py             # 週次・月次 CLI（Ollama → summaries UPSERT）
+│   ├── db.py, context.py, week_bounds.py, month_bounds.py, ollama_client.py
+│   └── prompts/weekly_hybrid.txt, monthly_hybrid.txt
 ├── dashboard/
 │   ├── app.py                  # Flask 本体
 │   ├── planet-dashboard.service
