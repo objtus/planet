@@ -527,6 +527,40 @@ async function loadYear() {
 // 統計カード
 // =========================================================
 
+/** OpenWeatherMap / WMO 由来の main・日本語 desc から天気絵文字 */
+function weatherEmoji(main, desc) {
+  const d = desc || '';
+  if (/激しい雷雨|雷雨/.test(d)) return '⛈';
+  if (/雹/.test(d)) return '⛈';
+  if (/雪|霰|小雪|大雪/.test(d)) return '❄️';
+  if (/雨|小雨|強い雨|にわか|霧雨|着氷性の雨/.test(d)) return '🌧';
+  if (/霧|着氷霧/.test(d)) return '🌫';
+  if (/快晴|ほぼ晴れ/.test(d)) return '☀️';
+  if (/晴れ時々曇り|時々曇/.test(d)) return '🌤';
+  if (/曇り|くもり|薄い雲|曇がち|雲/.test(d) && !/晴/.test(d)) return '☁️';
+
+  const m = String(main || '').toLowerCase();
+  if (m === 'thunderstorm') return '⛈';
+  if (m === 'drizzle') return '🌦';
+  if (m === 'rain') return '🌧';
+  if (m === 'snow') return '❄️';
+  if (['mist', 'fog', 'haze', 'smoke', 'dust', 'sand', 'ash', 'squall'].includes(m)) return '🌫';
+  if (m === 'tornado') return '🌪';
+  if (m === 'clear') return '☀️';
+  if (m === 'clouds') return '☁️';
+
+  const low = d.toLowerCase();
+  if (/thunder|storm/.test(low)) return '⛈';
+  if (/drizzle/.test(low)) return '🌦';
+  if (/rain|shower/.test(low)) return '🌧';
+  if (/snow/.test(low)) return '❄️';
+  if (/fog|mist|haze/.test(low)) return '🌫';
+  if (/clear/.test(low)) return '☀️';
+  if (/cloud/.test(low)) return '☁️';
+
+  return '🌡';
+}
+
 function clearStats() {
   ['stat-posts','stat-plays','stat-steps','stat-weather'].forEach(id => {
     const el = document.getElementById(id);
@@ -534,6 +568,11 @@ function clearStats() {
     el.querySelector('.stat-val').textContent = '—';
     el.querySelector('.stat-src').textContent = '';
   });
+  const strip = document.getElementById('week-weather-strip');
+  if (strip) {
+    strip.innerHTML = '';
+    strip.hidden = true;
+  }
 }
 
 function renderStats(s) {
@@ -562,8 +601,9 @@ function renderStats(s) {
   if (period === 'day' && s.weather) {
     const desc = s.weather.desc ?? '';
     const temp = s.weather.temp != null ? `${s.weather.temp}°` : '';
-    set('stat-weather', [desc, temp].filter(Boolean).join(' ') || '—',
-      s.weather.location ?? '');
+    const em   = weatherEmoji(s.weather.main, desc);
+    const line = [em, desc, temp].filter(Boolean).join(' ');
+    set('stat-weather', line.trim() || '—', s.weather.location ?? '');
   } else if (period !== 'day' && s.weather) {
     // 週・月・年: 平均気温 + min–max
     const avg  = s.weather.avg_temp != null ? `平均 ${s.weather.avg_temp}°` : '—';
@@ -573,6 +613,65 @@ function renderStats(s) {
   } else {
     set('stat-weather', '—', '');
   }
+
+  renderWeekWeatherStrip(period, s);
+}
+
+/** ISO 週の7日分（月曜始まり）を stat-row の直下に表示 */
+const WW_DOW = ['月', '火', '水', '木', '金', '土', '日'];
+
+function renderWeekWeatherStrip(period, s) {
+  const strip = document.getElementById('week-weather-strip');
+  if (!strip) return;
+
+  if (period !== 'week' || !Array.isArray(s.weather_days) || !s.weather_days.length) {
+    strip.innerHTML = '';
+    strip.hidden = true;
+    return;
+  }
+
+  let loc = s.weather?.location ?? '';
+  if (!loc) {
+    for (const d of s.weather_days) {
+      if (d.location) { loc = d.location; break; }
+    }
+  }
+
+  const parts = s.weather_days.map((d, i) => {
+    const md = d.date ? d.date.slice(5).replace('-', '/') : '';
+    let temp = '—';
+    if (d.temp_min != null || d.temp_max != null) {
+      const lo = d.temp_min != null ? Math.round(d.temp_min) : '—';
+      const hi = d.temp_max != null ? Math.round(d.temp_max) : '—';
+      temp = `${lo}° / ${hi}°`;
+    }
+    const rawDesc = (d.desc || '').trim();
+    const desc    = rawDesc || '—';
+    const em      = weatherEmoji(d.main, rawDesc);
+    return `<div class="ww-cell" title="${escapeHtml(d.desc || '')}">
+      <div class="ww-dow">${WW_DOW[i]}</div>
+      <div class="ww-date">${escapeHtml(md)}</div>
+      <div class="ww-icon" aria-hidden="true">${em}</div>
+      <div class="ww-temp">${temp}</div>
+      <div class="ww-desc">${escapeHtml(desc)}</div>
+    </div>`;
+  });
+
+  strip.innerHTML = `
+    <div class="ww-head">
+      <span class="ww-title">この週の天気</span>
+      ${loc ? `<span class="ww-loc">${escapeHtml(loc)}</span>` : ''}
+    </div>
+    <div class="ww-row">${parts.join('')}</div>`;
+  strip.hidden = false;
+}
+
+function escapeHtml(t) {
+  return String(t)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 // =========================================================

@@ -303,7 +303,8 @@ def create_app():
             # ---- 天気 ------------------------------------------------
             if period == "day":
                 cur.execute(
-                    "SELECT temp_max, weather_desc, location FROM weather_daily WHERE " + hd_where,
+                    "SELECT temp_max, weather_desc, location, weather_main "
+                    "FROM weather_daily WHERE " + hd_where,
                     hd_params,
                 )
                 w = cur.fetchone()
@@ -311,6 +312,7 @@ def create_app():
                     "desc":     w[1] if w else None,
                     "temp":     float(w[0]) if w and w[0] else None,
                     "location": w[2] if w else None,
+                    "main":     w[3] if w else None,
                 } if w else None
             else:
                 cur.execute(
@@ -332,14 +334,58 @@ def create_app():
                 else:
                     weather_obj = None
 
-            return jsonify({
+            # ---- 週ビュー: ISO 週の月〜日ごとの天気（stat 付近ストリップ用）----
+            weather_days = None
+            if period == "week":
+                try:
+                    yr_s, wk_s = date_arg.upper().split("-W", 1)
+                    iso_y, iso_w = int(yr_s), int(wk_s)
+                    monday = datetime.strptime(
+                        f"{iso_y}-{iso_w:02d}-1", "%G-%V-%u"
+                    ).date()
+                    sunday = monday + timedelta(days=6)
+                    cur.execute(
+                        """
+                        SELECT date, temp_max, temp_min, weather_desc, weather_main, location
+                          FROM weather_daily
+                         WHERE date >= %s AND date <= %s
+                         ORDER BY date
+                        """,
+                        (monday, sunday),
+                    )
+                    by_date = {row[0]: row for row in cur.fetchall()}
+                    weather_days = []
+                    for i in range(7):
+                        d = monday + timedelta(days=i)
+                        row = by_date.get(d)
+                        weather_days.append(
+                            {
+                                "date": d.isoformat(),
+                                "temp_max": float(row[1])
+                                if row and row[1] is not None
+                                else None,
+                                "temp_min": float(row[2])
+                                if row and row[2] is not None
+                                else None,
+                                "desc": row[3] if row else None,
+                                "main": row[4] if row else None,
+                                "location": row[5] if row else None,
+                            }
+                        )
+                except (ValueError, TypeError):
+                    weather_days = []
+
+            payload = {
                 "period":           period,
                 "posts":            post_cnt,
                 "posts_breakdown":  breakdown,
                 "plays":            play_cnt,
                 "steps":            steps,
                 "weather":          weather_obj,
-            })
+            }
+            if weather_days is not None:
+                payload["weather_days"] = weather_days
+            return jsonify(payload)
         finally:
             cur.close(); conn.close()
 
