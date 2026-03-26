@@ -663,6 +663,26 @@ select {
   text-align: center;
 }
 
+/* 年ビュー: タイムライン省略時の案内 */
+.tl-year-placeholder {
+  padding: 1.25rem 1rem 2rem;
+  text-align: center;
+  max-width: 28rem;
+  margin: 0 auto;
+}
+.tl-year-placeholder-title {
+  margin: 0 0 0.5rem;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+.tl-year-placeholder-note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-text-tertiary);
+}
+
 /* CW 折りたたみ */
 details summary {
   cursor: pointer;

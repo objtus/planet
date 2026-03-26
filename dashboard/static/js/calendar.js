@@ -52,6 +52,21 @@ function isoWeekFirstDay(isoYear, isoWeekNum) {
                   week1Mon.getDate() + (isoWeekNum - 1) * 7);
 }
 
+/** ISO 週の月〜日を「M月d日〜…」形式で表示（年をまたぐときは年も付与） */
+function isoWeekDateRangeLabel(isoYear, isoWeekNum) {
+  const mon = isoWeekFirstDay(isoYear, isoWeekNum);
+  const sun = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + 6);
+  const y1 = mon.getFullYear(), m1 = mon.getMonth() + 1, d1 = mon.getDate();
+  const y2 = sun.getFullYear(), m2 = sun.getMonth() + 1, d2 = sun.getDate();
+  if (y1 !== y2) {
+    return `${y1}年${m1}月${d1}日〜${y2}年${m2}月${d2}日`;
+  }
+  if (m1 === m2) {
+    return `${m1}月${d1}日〜${d2}日`;
+  }
+  return `${m1}月${d1}日〜${m2}月${d2}日`;
+}
+
 function dateStr(y, m, d) {
   return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
 }
@@ -458,9 +473,10 @@ async function loadDay() {
   const ds = dateStr(cur.year, cur.month, cur.selDay);
   const _d  = new Date(cur.year, cur.month, cur.selDay);
   const dow = ['日','月','火','水','木','金','土'][_d.getDay()];
-  setTlTitle(`${cur.month + 1}月${cur.selDay}日（${dow}）`);
+  setTlTitle(`${cur.year}年${cur.month + 1}月${cur.selDay}日（${dow}）`);
   showTimelineLoading();
   clearStats();
+  showFilterBarForTimeline(true);
   try {
     const [tl, stats] = await Promise.all([
       fetchJSON(`/api/timeline?period=day&date=${ds}`),
@@ -474,9 +490,11 @@ async function loadDay() {
 }
 
 async function loadWeek(year, week) {
-  setTlTitle(`${year}年 第${week}週`);
+  const range = isoWeekDateRangeLabel(year, week);
+  setTlTitle(`${year}年 第${week}週（${range}）`);
   showTimelineLoading();
   clearStats();
+  showFilterBarForTimeline(true);
   const weekStr = `${year}-W${String(week).padStart(2, '0')}`;
   try {
     const [tl, stats] = await Promise.all([
@@ -494,6 +512,7 @@ async function loadMonth() {
   setTlTitle(`${cur.year}年${cur.month + 1}月`);
   showTimelineLoading();
   clearStats();
+  showFilterBarForTimeline(true);
   const monthStr = `${cur.year}-${String(cur.month + 1).padStart(2, '0')}`;
   try {
     const [tl, stats] = await Promise.all([
@@ -507,17 +526,32 @@ async function loadMonth() {
   }
 }
 
+function showFilterBarForTimeline(show) {
+  const bar = document.getElementById('filter-bar');
+  if (bar) bar.style.display = show ? '' : 'none';
+}
+
+/** 年ビュー: 投稿一覧は取得・表示しない（負荷対策。将来サマリー一覧を表示予定） */
+function renderYearTimelinePlaceholder() {
+  const container = document.getElementById('timeline');
+  const noItems   = document.getElementById('no-items');
+  if (!container) return;
+  noItems.style.display = 'none';
+  container.innerHTML = `<div class="tl-year-placeholder">
+    <p class="tl-year-placeholder-title">投稿一覧は表示していません</p>
+    <p class="tl-year-placeholder-note">年単位では件数が多いためタイムラインを省略しています。今後、サマリー一覧をここに表示する予定です。</p>
+  </div>`;
+}
+
 async function loadYear() {
   setTlTitle(`${cur.year}年`);
   showTimelineLoading();
   clearStats();
+  showFilterBarForTimeline(false);
   try {
-    const [tl, stats] = await Promise.all([
-      fetchJSON(`/api/timeline?period=year&date=${cur.year}`),
-      fetchJSON(`/api/stats?period=year&date=${cur.year}`),
-    ]);
+    const stats = await fetchJSON(`/api/stats?period=year&date=${cur.year}`);
     renderStats(stats);
-    renderTimeline(tl.entries, 'year');
+    renderYearTimelinePlaceholder();
   } catch (e) {
     showTimelineError(e.message);
   }
