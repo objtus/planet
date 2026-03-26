@@ -576,7 +576,7 @@ async function loadWeek(year, week) {
     ]);
     renderStats(stats);
     renderTimeline(tl.entries, 'week');
-    renderSummaryPanelWeekOrMonth('week', sumPayload);
+    renderSummaryPanelWeekOrMonth('week', sumPayload, weekStr);
   } catch (e) {
     hideSummaryPanel();
     showTimelineError(e.message);
@@ -597,7 +597,7 @@ async function loadMonth() {
     ]);
     renderStats(stats);
     renderTimeline(tl.entries, 'month');
-    renderSummaryPanelWeekOrMonth('month', sumPayload);
+    renderSummaryPanelWeekOrMonth('month', sumPayload, monthStr);
   } catch (e) {
     hideSummaryPanel();
     showTimelineError(e.message);
@@ -693,9 +693,18 @@ function hideSummaryPanel() {
   const p = document.getElementById('summary-panel');
   if (!p) return;
   p.hidden = true;
-  const head = document.getElementById('summary-panel-head');
+  const title = document.getElementById('summary-panel-title');
+  const genBtn = document.getElementById('summary-generate-btn');
   const body = document.getElementById('summary-panel-body');
-  if (head) head.textContent = '';
+  if (title) title.textContent = '';
+  if (genBtn) {
+    genBtn.hidden = true;
+    genBtn.disabled = false;
+    delete genBtn.dataset.period;
+    delete genBtn.dataset.date;
+    delete genBtn.dataset.viewKind;
+    genBtn.textContent = 'この期間で生成';
+  }
   if (body) body.replaceChildren();
 }
 
@@ -708,13 +717,22 @@ async function fetchSummaryPayload(period, dateStr) {
   }
 }
 
-function renderSummaryPanelWeekOrMonth(kind, payload) {
+function renderSummaryPanelWeekOrMonth(kind, payload, dateStrForApi) {
   const p = document.getElementById('summary-panel');
-  const head = document.getElementById('summary-panel-head');
+  const title = document.getElementById('summary-panel-title');
+  const genBtn = document.getElementById('summary-generate-btn');
   const body = document.getElementById('summary-panel-body');
-  if (!p || !head || !body) return;
+  if (!p || !title || !body) return;
   p.hidden = false;
-  head.textContent = kind === 'week' ? '週次サマリー' : '月次サマリー';
+  title.textContent = kind === 'week' ? '週次サマリー' : '月次サマリー';
+  if (genBtn) {
+    genBtn.hidden = false;
+    genBtn.dataset.period = kind === 'week' ? 'week' : 'month';
+    genBtn.dataset.date = String(dateStrForApi);
+    genBtn.dataset.viewKind = kind;
+    genBtn.disabled = false;
+    genBtn.textContent = 'この期間で生成';
+  }
   body.replaceChildren();
   const sum = payload && payload.summary;
   if (sum && sum.content) {
@@ -738,11 +756,19 @@ function renderSummaryPanelWeekOrMonth(kind, payload) {
 
 function renderSummaryPanelYear(year, summaries) {
   const p = document.getElementById('summary-panel');
-  const head = document.getElementById('summary-panel-head');
+  const title = document.getElementById('summary-panel-title');
+  const genBtn = document.getElementById('summary-generate-btn');
   const body = document.getElementById('summary-panel-body');
-  if (!p || !head || !body) return;
+  if (!p || !title || !body) return;
   p.hidden = false;
-  head.textContent = `${year}年の月次サマリー`;
+  title.textContent = `${year}年の月次サマリー`;
+  if (genBtn) {
+    genBtn.hidden = true;
+    genBtn.disabled = false;
+    delete genBtn.dataset.period;
+    delete genBtn.dataset.date;
+    delete genBtn.dataset.viewKind;
+  }
   body.replaceChildren();
   const list = Array.isArray(summaries) ? summaries : [];
   if (!list.length) {
@@ -799,6 +825,55 @@ window.goToMonthFromSummary = function(year, monthIndex) {
   if (selY) selY.value = String(year);
   void refreshCalWithHeat().then(() => loadMonth());
 };
+
+async function onSummaryGenerateClick() {
+  const btn = document.getElementById('summary-generate-btn');
+  if (!btn || btn.hidden || btn.disabled) return;
+  const period = btn.dataset.period;
+  const date = btn.dataset.date;
+  const viewKind = btn.dataset.viewKind;
+  if (!period || !date || !viewKind) return;
+
+  btn.disabled = true;
+  const orig = btn.textContent;
+  btn.textContent = '生成中…';
+
+  const ctrl = new AbortController();
+  const abortTid = setTimeout(() => ctrl.abort(), 900000);
+
+  try {
+    const r = await fetch('/api/summaries/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ period, date }),
+      signal: ctrl.signal,
+    });
+    let j = {};
+    try {
+      j = await r.json();
+    } catch (_) { /* ignore */ }
+    if (!r.ok) {
+      alert(j.error || `生成に失敗しました（${r.status}）`);
+      return;
+    }
+    if (j.skipped) {
+      alert(j.message || 'この期間のログがなく、生成をスキップしました。');
+      return;
+    }
+    const sumPayload = await fetchSummaryPayload(period, date);
+    renderSummaryPanelWeekOrMonth(viewKind, sumPayload, date);
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      alert('通信がタイムアウトまたは中断されました。');
+    } else {
+      alert(e.message || '通信エラー');
+    }
+  } finally {
+    clearTimeout(abortTid);
+    btn.disabled = false;
+    btn.textContent = orig;
+  }
+}
 
 function clearStats() {
   hideSummaryPanel();
@@ -1284,6 +1359,11 @@ function buildFilterBar() {
 // =========================================================
 
 buildFilterBar();
+
+document.getElementById('summary-generate-btn')?.addEventListener('click', () => {
+  void onSummaryGenerateClick();
+});
+
 {
   const hm = document.getElementById('heat-metric');
   if (hm) {

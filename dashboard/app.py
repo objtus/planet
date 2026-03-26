@@ -712,6 +712,81 @@ def create_app():
             cur.close()
             conn.close()
 
+    @app.route("/api/summaries/generate", methods=["POST"])
+    def api_summaries_generate():
+        """Ollama 週次・月次サマリーを subprocess で生成（カレンダー UI 用）。"""
+        data = request.get_json(silent=True) or {}
+        period = (data.get("period") or "").strip().lower()
+        date_arg = (data.get("date") or "").strip()
+        if period not in ("week", "month") or not date_arg:
+            return jsonify({"error": "period (week|month) と date が必要です"}), 400
+
+        if period == "week":
+            try:
+                from summarizer.week_bounds import parse_iso_week_date
+
+                y, w, _m, _s = parse_iso_week_date(date_arg)
+                norm_date = f"{y}-W{w:02d}"
+            except ValueError as e:
+                return jsonify({"error": str(e)}), 400
+        else:
+            try:
+                from summarizer.month_bounds import parse_year_month
+
+                y, mo = parse_year_month(date_arg)
+                norm_date = f"{y}-{mo:02d}"
+            except ValueError as e:
+                return jsonify({"error": str(e)}), 400
+
+        py_exe = ROOT / "venv" / "bin" / "python"
+        if not py_exe.is_file():
+            return jsonify({"error": "venv/bin/python が見つかりません"}), 500
+
+        env = {**os.environ, "PYTHONPATH": str(ROOT)}
+        cmd = [
+            str(py_exe),
+            "-m",
+            "summarizer.generate",
+            "--period",
+            period,
+            "--date",
+            norm_date,
+        ]
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=900,
+                cwd=str(ROOT),
+                env=env,
+            )
+        except subprocess.TimeoutExpired:
+            return jsonify({"error": "タイムアウト（900秒）。Ollama の応答を確認してください。"}), 504
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+        stderr = (result.stderr or "").strip()
+        stdout = (result.stdout or "").strip()
+
+        if result.returncode == 0:
+            if "ログが 0 件のためスキップ" in stderr or "スキップします" in stderr:
+                msg = stderr[-500:] if stderr else "この期間のログがありません。"
+                return jsonify({"ok": True, "skipped": True, "message": msg})
+            if "保存しました" in stdout or not stderr:
+                return jsonify({"ok": True, "skipped": False})
+            return jsonify(
+                {
+                    "ok": True,
+                    "skipped": False,
+                    "output": stdout[-400:] if stdout else "",
+                }
+            )
+
+        err_text = (stderr or stdout or "生成に失敗しました")[-1200:]
+        status = 400 if result.returncode == 2 else 500
+        return jsonify({"error": err_text}), status
+
     # ------------------------------------------------------------------ #
     # 統計
     # ------------------------------------------------------------------ #
