@@ -5,6 +5,74 @@ from collectors.base import BaseCollector
 
 API_URL = "https://api.github.com"
 USED_TYPES = {"PushEvent", "CreateEvent", "ReleaseEvent"}
+# git の空ツリー（新規 ref など before がダミーのとき compare の片側に使う）
+_GIT_EMPTY_TREE_SHA = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+
+
+def _before_is_dummy(before: str | None) -> bool:
+    if not before:
+        return True
+    s = before.strip().lower()
+    return len(s) < 7 or all(c == "0" for c in s)
+
+
+def _fetch_push_commits_from_api(
+    repo_name: str, payload: dict, headers: dict
+) -> tuple[int, list[str]]:
+    """Events の Push ペイロードに commits が無いとき、Compare / Commits API で件数と件名を取る。"""
+    if "/" not in repo_name:
+        return 0, []
+    head = (payload.get("head") or "").strip()
+    if not head or len(head) < 7:
+        return 0, []
+    owner, _, repo = repo_name.partition("/")
+    if not owner or not repo:
+        return 0, []
+    before = (payload.get("before") or "").strip()
+
+    def _compare(base: str) -> tuple[int, list[str]] | None:
+        url = f"{API_URL}/repos/{owner}/{repo}/compare/{base}...{head}"
+        try:
+            r = requests.get(url, headers=headers, timeout=30)
+            if not r.ok:
+                return None
+            data = r.json()
+            raw = data.get("commits") or []
+            cc = int(data.get("total_commits") or len(raw) or 0)
+            lines: list[str] = []
+            for c in raw:
+                msg = (c.get("commit") or {}).get("message") or ""
+                first = msg.split("\n", 1)[0].strip()
+                if first:
+                    lines.append(first)
+            return (cc or len(lines), lines)
+        except requests.RequestException:
+            return None
+
+    if not _before_is_dummy(before):
+        out = _compare(before)
+        if out and (out[0] > 0 or out[1]):
+            return out
+
+    out = _compare(_GIT_EMPTY_TREE_SHA)
+    if out and (out[0] > 0 or out[1]):
+        return out
+
+    try:
+        r = requests.get(
+            f"{API_URL}/repos/{owner}/{repo}/commits/{head}",
+            headers=headers,
+            timeout=30,
+        )
+        if r.ok:
+            data = r.json()
+            msg = (data.get("commit") or {}).get("message") or ""
+            first = msg.split("\n", 1)[0].strip()
+            if first:
+                return 1, [first]
+    except requests.RequestException:
+        pass
+    return 0, []
 
 
 class GithubCollector(BaseCollector):
@@ -48,9 +116,32 @@ class GithubCollector(BaseCollector):
                 payload = event.get("payload", {})
 
                 if event["type"] == "PushEvent":
-                    commit_count = payload.get("size", 0)
-                    msgs = [c["message"].split("\n")[0] for c in payload.get("commits", [])]
-                    summary = f"Push {commit_count}件: " + " / ".join(msgs[:3])
+                    commit_count = int(payload.get("size", 0) or 0)
+                    msgs = [
+                        (c.get("message") or "").split("\n", 1)[0].strip()
+                        for c in (payload.get("commits") or [])
+                        if (c.get("message") or "").strip()
+                    ]
+                    if commit_count == 0 and msgs:
+                        commit_count = len(msgs)
+                    if not msgs:
+                        api_n, api_msgs = _fetch_push_commits_from_api(
+                            repo_name, payload, headers
+                        )
+                        if api_msgs:
+                            msgs = api_msgs
+                        if api_n:
+                            commit_count = api_n
+                        elif msgs and commit_count == 0:
+                            commit_count = len(msgs)
+                    if msgs:
+                        summary = (
+                            f"Push {commit_count}件: " + " / ".join(msgs[:5])
+                        )
+                    elif commit_count > 0:
+                        summary = f"Push {commit_count}件（メッセージ未取得）"
+                    else:
+                        summary = "Push（Events API にコミット情報なし）"
                     content = f"{repo_name}: {summary}"
                 elif event["type"] == "CreateEvent":
                     ref_type = payload.get("ref_type", "")
