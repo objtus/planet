@@ -22,7 +22,8 @@
         </label>
         <span style="font-size:11px;color:var(--color-text-tertiary);margin-left:auto">{{ item.created_at }}</span>
       </div>
-      <div class="summary-content">{{ item.content }}</div>
+      <div class="summary-md-raw u-hidden" aria-hidden="true">{{ item.content }}</div>
+      <div class="summary-content summary-md-rendered"></div>
     </div>
     {% endfor %}
     {% else %}
@@ -35,6 +36,16 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="{{ url_for('static', filename='js/purify.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/marked.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/summary_markdown.js') }}"></script>
+<script>
+(function () {
+  if (typeof initSummariesPageMarkdown === 'function') {
+    initSummariesPageMarkdown();
+  }
+})();
+</script>
 <script>
 (function () {
   const card = document.querySelector('.page .card');

@@ -559,6 +559,10 @@ select {
   color: var(--color-text-primary);
   line-height: 1.5;
 }
+.summary-panel-md {
+  margin: 0;
+  min-width: 0;
+}
 .summary-panel-text {
   margin: 0;
   white-space: pre-wrap;
@@ -568,6 +572,69 @@ select {
   line-height: 1.55;
   color: var(--color-text-primary);
 }
+/* Markdown レンダリ結果（カレンダーパネル・サマリー一覧） */
+.summary-md {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--color-text-primary);
+  word-break: break-word;
+}
+.summary-md :first-child { margin-top: 0; }
+.summary-md :last-child { margin-bottom: 0; }
+.summary-md h1, .summary-md h2, .summary-md h3 {
+  font-size: 1.05em;
+  font-weight: 600;
+  margin: 0.85em 0 0.4em;
+  color: var(--color-text-primary);
+}
+.summary-md h1 { font-size: 1.15em; }
+.summary-md p { margin: 0.5em 0; }
+.summary-md ul, .summary-md ol {
+  margin: 0.5em 0;
+  padding-left: 1.35em;
+}
+.summary-md li { margin: 0.2em 0; }
+.summary-md a {
+  color: var(--color-text-info);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.summary-md a:hover { opacity: 0.9; }
+.summary-md code {
+  font-family: ui-monospace, monospace;
+  font-size: 0.92em;
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  background: var(--color-background-primary);
+  border: 0.5px solid var(--color-border-tertiary);
+}
+.summary-md pre {
+  margin: 0.65em 0;
+  padding: 8px 10px;
+  overflow-x: auto;
+  font-size: 12px;
+  line-height: 1.45;
+  background: var(--color-background-primary);
+  border: 0.5px solid var(--color-border-tertiary);
+  border-radius: var(--border-radius-sm);
+}
+.summary-md pre code {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.summary-md blockquote {
+  margin: 0.5em 0;
+  padding-left: 0.85em;
+  border-left: 3px solid var(--color-border-tertiary);
+  color: var(--color-text-secondary);
+}
+.summary-md hr {
+  border: 0;
+  border-top: 0.5px solid var(--color-border-tertiary);
+  margin: 0.85em 0;
+}
+.summary-md strong { font-weight: 600; }
 .summary-panel-empty {
   margin: 0;
   font-size: 13px;
@@ -1166,6 +1233,21 @@ details[open] summary::before { content: "▼ "; }
   color: var(--color-text-primary);
   white-space: pre-wrap;
   line-height: 1.6;
+}
+.summary-content.summary-md-rendered {
+  white-space: normal;
+}
+/* レンダリ前の生テキスト（JS が除去するまでのみ存在） */
+.u-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
 }
 .pill {
   display: inline-block;

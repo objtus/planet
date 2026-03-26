@@ -678,6 +678,17 @@ function weatherEmoji(main, desc) {
   return '🌡';
 }
 
+/** 年ビュー用: マークダウン記号を除いた 1 行抜粋 */
+function _summaryPlainExcerpt(s) {
+  return String(s)
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/`+/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function hideSummaryPanel() {
   const p = document.getElementById('summary-panel');
   if (!p) return;
@@ -707,10 +718,16 @@ function renderSummaryPanelWeekOrMonth(kind, payload) {
   body.replaceChildren();
   const sum = payload && payload.summary;
   if (sum && sum.content) {
-    const pre = document.createElement('pre');
-    pre.className = 'summary-panel-text';
-    pre.textContent = sum.content;
-    body.appendChild(pre);
+    const block = typeof renderSummaryMarkdown === 'function'
+      ? renderSummaryMarkdown(sum.content)
+      : (() => {
+          const pre = document.createElement('pre');
+          pre.className = 'summary-panel-text';
+          pre.textContent = sum.content;
+          return pre;
+        })();
+    block.classList.add('summary-panel-md');
+    body.appendChild(block);
   } else {
     const empty = document.createElement('p');
     empty.className = 'summary-panel-empty';
@@ -751,7 +768,7 @@ function renderSummaryPanelYear(year, summaries) {
       : ps;
     const excerpt = document.createElement('span');
     excerpt.className = 'summary-year-excerpt';
-    const raw = (s.content || '').replace(/\s+/g, ' ').trim();
+    const raw = _summaryPlainExcerpt(s.content || '');
     excerpt.textContent = raw.length > 100 ? `${raw.slice(0, 100)}…` : raw;
     const btn = document.createElement('button');
     btn.type = 'button';

@@ -127,5 +127,8 @@
 const SOURCES = {{ sources | tojson }};
 const TODAY   = "{{ today }}";
 </script>
+<script src="{{ url_for('static', filename='js/purify.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/marked.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/summary_markdown.js') }}"></script>
 <script src="{{ url_for('static', filename='js/calendar.js') }}"></script>
 {% endblock %}
