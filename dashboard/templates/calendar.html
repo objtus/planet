@@ -92,6 +92,15 @@
 {% endblock %}
 
 {% block scripts %}
+<!-- ライトボックス -->
+<div id="lightbox" class="lb-overlay" style="display:none" onclick="closeLightbox(event)">
+  <button class="lb-close" onclick="event.stopPropagation(); _closeLightbox()" title="閉じる（Esc）">✕</button>
+  <button class="lb-nav lb-prev lb-hidden" onclick="event.stopPropagation(); navigateLightbox(-1)" title="前の画像">‹</button>
+  <img id="lb-img" class="lb-img" src="" alt="" onclick="event.stopPropagation()">
+  <button class="lb-nav lb-next lb-hidden" onclick="event.stopPropagation(); navigateLightbox(1)" title="次の画像">›</button>
+  <div id="lb-counter" class="lb-counter lb-hidden"></div>
+</div>
+
 <script>
 const HEATMAP = {{ heatmap | tojson }};
 const SOURCES = {{ sources | tojson }};

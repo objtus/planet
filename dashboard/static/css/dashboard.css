@@ -736,6 +736,96 @@ details[open] summary::before { content: "▼ "; }
 .pill-pub  { background: #E1F5EE; color: #0F6E56; border-color: #5DCAA5; }
 
 /* =========================================================
+   LIGHTBOX
+   ========================================================= */
+
+.lb-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  cursor: zoom-out;
+}
+
+.lb-img {
+  max-width: min(90vw, 1200px);
+  max-height: 88vh;
+  object-fit: contain;
+  border-radius: 6px;
+  box-shadow: 0 4px 40px rgba(0, 0, 0, 0.6);
+  cursor: default;
+  display: block;
+}
+
+.lb-close {
+  position: fixed;
+  top: 14px; right: 14px;
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  border: none;
+  color: #fff;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  transition: background 0.15s;
+}
+.lb-close:hover { background: rgba(255, 255, 255, 0.3); }
+
+.lb-nav {
+  position: fixed;
+  top: 50%; transform: translateY(-50%);
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  border: none;
+  color: #fff;
+  font-size: 26px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  transition: background 0.15s;
+}
+.lb-nav:hover { background: rgba(255, 255, 255, 0.3); }
+.lb-nav.lb-hidden { display: none; }
+.lb-prev { left: 14px; }
+.lb-next { right: 14px; }
+
+.lb-counter {
+  position: fixed;
+  bottom: 18px;
+  left: 50%; transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.55);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 12px;
+  padding: 4px 14px;
+  border-radius: 20px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.lb-counter.lb-hidden { display: none; }
+
+/* メディアサムネイルボタン（旧 <a> 置き換え） */
+.tl-media-btn {
+  display: block;
+  line-height: 0;
+  position: relative;
+  border: none;
+  padding: 0;
+  background: transparent;
+  cursor: zoom-in;
+}
+.tl-media-btn:hover { background: transparent; }
+
+/* =========================================================
    RESPONSIVE
    ========================================================= */
 

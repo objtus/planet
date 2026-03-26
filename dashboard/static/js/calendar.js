@@ -563,9 +563,68 @@ function esc(s) {
   return (s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+// =========================================================
+// ライトボックス
+// =========================================================
+
+let _lbUrls = [];
+let _lbIdx  = 0;
+
+function openLightbox(urls, idx) {
+  _lbUrls = urls;
+  _lbIdx  = idx;
+  _updateLightbox();
+  document.getElementById('lightbox').style.display = 'flex';
+  document.addEventListener('keydown', _onLbKey);
+}
+
+function _updateLightbox() {
+  document.getElementById('lb-img').src = _lbUrls[_lbIdx];
+  const multi   = _lbUrls.length > 1;
+  const prev    = document.querySelector('.lb-prev');
+  const next    = document.querySelector('.lb-next');
+  const counter = document.getElementById('lb-counter');
+  if (prev)    prev.classList.toggle('lb-hidden', !multi);
+  if (next)    next.classList.toggle('lb-hidden', !multi);
+  if (counter) {
+    counter.classList.toggle('lb-hidden', !multi);
+    if (multi) counter.textContent = `${_lbIdx + 1} / ${_lbUrls.length}`;
+  }
+}
+
+function _closeLightbox() {
+  document.getElementById('lightbox').style.display = 'none';
+  document.getElementById('lb-img').src = '';
+  document.removeEventListener('keydown', _onLbKey);
+}
+
+function closeLightbox(e) {
+  if (e && e.target !== e.currentTarget) return;
+  _closeLightbox();
+}
+
+function navigateLightbox(dir) {
+  _lbIdx = (_lbIdx + dir + _lbUrls.length) % _lbUrls.length;
+  _updateLightbox();
+}
+
+function _onLbKey(e) {
+  if      (e.key === 'Escape')      _closeLightbox();
+  else if (e.key === 'ArrowLeft')   navigateLightbox(-1);
+  else if (e.key === 'ArrowRight')  navigateLightbox(1);
+}
+
 /** メディア添付の HTML を生成 */
 function mediaHTML(mediaList) {
   if (!mediaList || !mediaList.length) return '';
+
+  // ライトボックス用: 画像のみの URL リストを収集
+  const imageUrls = mediaList
+    .filter(m => !(m.type || '').startsWith('video') && m.type !== 'gifv')
+    .map(m => m.url || m.thumb)
+    .filter(Boolean);
+
+  let imgIdx = 0;
   const imgs = mediaList.map(m => {
     const isVideo = (m.type || '').startsWith('video') || m.type === 'video' || m.type === 'gifv';
     const thumb   = m.thumb || m.url;
@@ -575,9 +634,14 @@ function mediaHTML(mediaList) {
                 <img src="${esc(thumb)}" loading="lazy" alt="">
               </a>`;
     }
-    return `<a href="${esc(m.url)}" target="_blank" rel="noopener">
+    // 画像: ライトボックスで開く
+    const urlsAttr = JSON.stringify(imageUrls).replace(/"/g, '&quot;');
+    const idx      = imgIdx++;
+    return `<button class="tl-media-btn" data-urls="${urlsAttr}" data-idx="${idx}"
+                    onclick="openLightbox(JSON.parse(this.dataset.urls), parseInt(this.dataset.idx))"
+                    title="画像を拡大">
               <img src="${esc(thumb)}" loading="lazy" alt="" class="tl-media-img">
-            </a>`;
+            </button>`;
   });
   return `<div class="tl-media">${imgs.join('')}</div>`;
 }
