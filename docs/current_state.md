@@ -184,11 +184,21 @@
 
 #### 残タスク（Phase 5）
 
+**優先（サマリー整備 → Phase 6 接続）** — 手順は `docs/summary_integration_plan.md`
+
+- [ ] サマリー: `is_published` 更新 API + `/summaries` からトグル UI
+- [ ] （推奨）`GET /api/summary` で週・月単位の 1 件取得
+- [ ] カレンダー: 週/月ビューにサマリーパネル。年ビューは月次サマリー一覧（`summaries`）
+
+**その他**
+
 - [ ] デザイン・UI の細部調整（mockup/calender_v3.html との差分修正）
-- [ ] 検索: LIKE → pg_bigm 全文検索に切り替え
-- [ ] カレンダー: 週/月/年ビューにサマリー表示（summaries テーブルから取得）
-- [ ] サマリー: 公開トグル（is_published の更新 API）
-- [ ] ソース管理: 新規追加フォーム
+
+**バックログ（必要性低）**
+
+- ソース管理: 新規追加フォーム → `docs/next_tasks.md` バックログ参照
+
+検索（`/search`）は現状 `LIKE` 部分一致で十分な速度のため、**pg_bigm / GIN を活かす書き方への切替は優先度低・任意**（ログ増加で遅くなった場合などに検討。`docs/next_tasks.md` のバックログ参照）。
 
 ---
 
