@@ -41,8 +41,10 @@ url = "https://yuinoid.neocities.org/rss.xml"
 [neocities]
 api_key = "YOUR_NEOCITIES_API_KEY"
 
+# Ollama: 使うモデルは事前に `ollama pull <model>` が必要。利用可能は `ollama list`。
 [ollama]
 base_url = "http://localhost:11434"
+# design.md の例。無い場合は llama3.2 / gemma2:9b 等に変更
 model    = "gemma3:12b"
 
 [flask]

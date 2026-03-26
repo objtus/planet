@@ -1,6 +1,6 @@
 # Phase 6: AI 生成・公開 — 実装プラン
 
-**最終更新**: 2026-03-26
+**最終更新**: 2026-03-26（M2 計画・タスク分解を追記）
 
 **前提**: Phase 5 のダッシュボードは機能完成扱い。`summaries` の閲覧・カレンダー連携・公開トグル・`GET /api/summary` は実装済み（契約は `docs/summary_integration_plan.md`）。本フェーズでは **行の自動生成** と **Neocities への反映** を追加する。
 
@@ -58,11 +58,103 @@
 
 **完了条件**: ローカルで 1 週分実行 → `/summaries` とカレンダー週ビューのパネルに表示。
 
+#### M1 タスク分解（実装順）
+
+以下は **上から順に着手しやすい** 並び。並列可能なものは注記する。
+
+| ID | タスク | 内容・成果物 | 依存 |
+|----|--------|----------------|------|
+| **1.1** | 設定スキーマ | `config/settings.toml.example` に `[ollama]` を追加（例: `host = "http://127.0.0.1:11434"`、`model = "gemma3:12b"`）。実機の `settings.toml` には手動で同ブロックを追記（git に載せない）。 | なし |
+| **1.2** | パッケージ配置 | `summarizer/__init__.py` を作成（空または短い docstring）。リポジトリルートから `python -m summarizer.generate ...` または `python summarizer/generate.py` のどちらか一方に統一し、**README または本ファイルに実行例 1 行**を残す。 | 1.1 |
+| **1.3** | CLI 引数と ISO 週 | `argparse` で `--period week`（M1 では week のみ必須）と `--date YYYY-Www`（大文字小文字許容）を受け取る。`datetime.strptime(f"{y}-{w:02d}-1", "%G-%V-%u").date()` で **月曜**を得て `period_start` / **日曜**を `period_end` にし、`week_number` を ISO 週番号に設定（`app.py` の週キーと同一解釈）。無効な `--date` は終了コード非 0 でメッセージ。 | 1.2 |
+| **1.4** | 時間窓（JST） | 集計用に「その週の月曜 00:00 JST」〜「翌週月曜 00:00 JST 未満」の `timestamptz` 範囲を決める（`logs.timestamp` は UTC 保存想定）。`zoneinfo` または既存コードと同じ `Asia/Tokyo` の扱いに揃える。 | 1.3 |
+| **1.5** | DB 接続 | `tomllib` で `settings.toml` を読み、`psycopg2` で接続する薄いヘルパ（`summarizer/db.py` など）。ダッシュボードと **同一ファイル**を参照する前提を docstring に書く。 | 1.1 |
+| **1.6** | コンテキスト取得 v1 | 上記 JST 範囲で `logs` を `is_deleted=FALSE`、`timestamp` 昇順で取得。各行を **1 行テキスト**に整形（例: `[YYYY-MM-DD HH:MM] (source_id) content の先頭 N 文字`）。件数が多い場合は **直近 K 件に制限**し、コメントで「M3/M4 で拡張」と明記。M1 では visibility フィルタは **未実装でも可**（Neocities 向けは M4 以降で厳密化）。 | 1.4, 1.5 |
+| **1.7** | プロンプトテンプレ | `summarizer/prompts/weekly_hybrid.txt` を追加。プレースホルダ例: `{{ACTIVITY_DIGEST}}`（1.6 の平文）、`{{WEEK_LABEL}}`（人間可読の週ラベル）。`design.md` §7 の見出し構成に近づけるが、M1 は「動く」ことを優先。 | 1.2 |
+| **1.8** | Ollama 呼び出し | `requests.post(f"{host}/api/generate", json={...})` で `model` と `prompt` を渡し、レスポンスから `response` フィールドを取り出す。タイムアウト・HTTP エラー・JSON 異常時は **stderr に理由**を出して非 0 終了。stream=false でよい。 | 1.1 |
+| **1.9** | UPSERT | `INSERT INTO summaries (period_type, period_start, period_end, week_number, content, model, prompt_style) VALUES ('weekly', ...)` + `ON CONFLICT (period_type, period_start) DO UPDATE SET period_end=EXCLUDED.period_end, week_number=EXCLUDED.week_number, content=EXCLUDED.content, model=EXCLUDED.model, prompt_style=EXCLUDED.prompt_style`。**`is_published` / `published_at` は UPDATE 句に含めない**（既存値を保持）。 | 1.5, 1.3, 1.8 |
+| **1.10** | 空データ方針 | 1.6 の結果が 0 件のとき: (A) Ollama を呼ばず終了コード 0 でスキップ、または (B) 固定短文を `content` に UPSERT、のどちらかをコードとコメントで固定。推奨は **(A) スキップ**（ダッシュボードは「まだありません」のまま）。 | 1.6, 1.9 |
+| **1.11** | 結線と動作確認 | `generate.py` で 1.3→1.6→1.7→1.8→1.9 を直列実行。実 DB でデータがある週を 1 つ選び実行 → `psql` または `/summaries`・カレンダー週ビューで表示確認。再実行で本文だけ差し替わり、`is_published` が変わらないことを確認。 | 1.3–1.10 |
+
+**並列作業の例**: 1.5（DB）と 1.7（プロンプト文言）は 1.2 後なら別担当が同時に進められる。1.8（Ollama）は 1.6 と並行可能（結線前まで）。
+
+**M1 のスコープ外（明示的に後回し）**: 月次 CLI、バッチ、Neocities、visibility 厳密フィルタ、トークン数に基づく動的トリミング（コメント TODO でよい）。
+
+**実行例（リポジトリルート）**:
+
+```bash
+# システムの python3 ではなく、プロジェクト venv を使う（psycopg2 が入っている）
+./venv/bin/python -m summarizer.generate --period week --date 2026-W12
+```
+
+`config/settings.toml` に `[database]` と `[ollama]`（`base_url`, `model`）が必要。ログ 0 件の週は終了コード 0 でスキップ。
+
 ### M2 — 月次パイプライン
 
-- `summarizer/prompts/monthly_hybrid.txt`  
-- CLI `--period month --date 2026-03`  
-- 月の `[start, end]` で同じ集約ロジックを再利用。
+目的: 手動コマンド 1 回で「指定した暦月」の `monthly` 行が `summaries` に入り、**カレンダー月ビュー**と **`GET /api/summary?period=month&date=YYYY-MM`**・`/summaries` と整合する。
+
+#### M2 と M1 の関係（再利用）
+
+| 部品 | 月次での扱い |
+|------|----------------|
+| `summarizer/db.py` / `load_config` / `get_conn` | そのまま |
+| `summarizer/ollama_client.py` | そのまま |
+| `summarizer/context.fetch_activity_digest(conn, start_utc, end_utc)` | **そのまま**（引数の UTC 範囲だけ「月の JST 窓」に変える） |
+| 件数上限（`MAX_LOG_LINES` 等） | 月はログ量が週の約 4 倍。**同じ上限のまま**なら「直近 K 件」が月の後半に偏る。M2 では上限を月用に上げるか、v1 は週と同じにしてコメントで明示し、M3 以降で調整してよい |
+| 週次の `finalize_weekly_markdown` / 先頭 `#`・`##` 剥がし | **月次用に同等の関数**を追加（例: `## 月次サマリー（…）` を機械付与。モデルに H2 を書かせない） |
+
+#### M2 で新規に必要なもの
+
+1. **月の日付境界**  
+   - `period_start` = その月 **1 日**（`date`）、`period_end` = **月末**（`calendar.monthrange` 等）。  
+   - **JST** で「当月 1 日 00:00」〜「翌月 1 日 00:00 未満」を UTC の aware `datetime` にし、`logs.timestamp` と比較（週次の `week_bounds.py` と同じ `Asia/Tokyo` 方針）。
+
+2. **CLI**  
+   - `argparse` で `--period month` と `--date YYYY-MM`（ゼロ埋め `2026-03` を正とするか、`2026-3` も許容するかは実装で固定）。  
+   - `generate.py` を **week / month 分岐**に拡張（`run_week` / `run_month` への分割や `summarizer/month_bounds.py` の追加は任意）。
+
+3. **プロンプト**  
+   - `summarizer/prompts/monthly_hybrid.txt`  
+   - プレースホルダ例: `{{MONTH_LABEL}}`（人間可読の月）、`{{ACTIVITY_DIGEST}}`  
+   - 見出しは週次と揃え **`### 今月のトピック`** から始め、**先頭に `#` / `##` を書かない**（週次プロンプトと同方針）。本文は `design.md` §7 のトーンに寄せつつ「今月の〜」に言い換え。
+
+4. **UPSERT**  
+   - `period_type = 'monthly'`、`week_number = NULL`（スキーマ上 NULL 可）。  
+   - `ON CONFLICT (period_type, period_start) DO UPDATE` の列は週次と同様。**`is_published` / `published_at` は UPDATE に含めない**。
+
+5. **空データ**  
+   - 週次と同じく **(A) ログ 0 件なら Ollama を呼ばず終了コード 0 でスキップ**を推奨。
+
+#### M2 任意拡張（後回し可）
+
+- その月の **`weekly` 行を DB から読み、プロンプトに「週次サマリーの要約」として付ける** → 生ログよりトークン削減・月次の一貫性向上。M2 必須ではない。  
+- 月次だけ `--timeout` 既定を長めにする。
+
+#### M2 タスク分解（実装順）
+
+| ID | タスク | 内容・成果物 | 依存 |
+|----|--------|----------------|------|
+| **2.1** | 月境界モジュール | `summarizer/month_bounds.py`（または `week_bounds` 拡張）: `parse_year_month(s) -> (year, month)`、`month_utc_range(year, month) -> (start_utc, end_utc)`、月末日の算出、`month_label(...)` 文字列 | なし |
+| **2.2** | CLI 拡張 | `generate.py`: `--period` に `month` を追加。`month` のとき `--date` は `YYYY-MM`。`week` 時は従来どおり `YYYY-Www` | 2.1 |
+| **2.3** | 月次プロンプト | `summarizer/prompts/monthly_hybrid.txt`（プレースホルダ・見出し方針は週次と整合） | なし |
+| **2.4** | finalize 月次 | `finalize_monthly_markdown(body, month_label_text)`（週次と同じく先頭 H1/H2 を剥がしてから機械 H2 を付与） | 2.1 |
+| **2.5** | コンテキスト | `fetch_activity_digest` をそのまま呼ぶ。必要なら月用 `MAX_LOG_LINES` 定数を分ける（`context.py`） | 2.1, 既存 context |
+| **2.6** | upsert_monthly | `INSERT ... monthly ... week_number NULL` + `ON CONFLICT`（`is_published` 不更新） | 既存 db |
+| **2.7** | main 結線 | ログ取得 → 空ならスキップ → テンプレ読み込み → Ollama → finalize → upsert | 2.2–2.6, 2.3 |
+| **2.8** | 動作確認 | データがある月で実行 → `/summaries`・カレンダー**月**ビューで表示。再実行で本文のみ更新・公開フラグ維持 | 2.7 |
+
+**実行例（リポジトリルート）**:
+
+```bash
+./venv/bin/python -m summarizer.generate --period month --date 2026-01
+```
+
+#### M2 と M3 の境界
+
+- M2 は **1 ヶ月・1 コマンド**まで。  
+- **複数月のループ**・`--force`・再開可能バッチは **M3** に任せる。
+
+**完了条件**: 上記実行例が成功し、ダッシュボードの月次サマリーパネルと API が `monthly` 行を表示する。
 
 ### M3 — 過去分一括生成
 
@@ -100,7 +192,7 @@
 
 ## 5. テスト観点（手動で可）
 
-- データなしの週: エラーで終了か、短い「データ不足」サマリーかを仕様として固定。  
+- データなしの**週・月**: スキップ (A) なら終了コード 0 と stderr メッセージが仕様どおりか。  
 - Ollama 停止時: 非ゼロ終了コード・メッセージ明確化。  
 - 再実行: 同一 `(period_type, period_start)` で内容だけ差し替わり、公開フラグは意図どおり保持。  
 - Neocities: ドラフト HTML をローカル保存してからアップロードするデバッグモードがあると安全。

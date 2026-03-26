@@ -80,7 +80,7 @@ planet/
 │   ├── static/js/chart.umd.min.js
 │   └── templates/
 ├── mockup/                  # UI デザインモックアップ
-├── summarizer/              # Ollamaサマリー生成（未実装）
+├── summarizer/              # Ollamaサマリー生成（週次 CLI M1 → `./venv/bin/python -m summarizer.generate`）
 ├── publisher/               # Neocities公開スクリプト（未実装）
 ├── backup/                  # バックアップスクリプト（未実装）
 └── docs/                    # ドキュメント群

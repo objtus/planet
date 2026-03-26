@@ -4,7 +4,7 @@
 
 **実装状況（2026-03）**: フェーズ A・B（API・一覧トグル・カレンダーパネル・`GET /api/summary`）は**実装済み**。フェーズ C（`summarizer/generate.py`・Neocities）は **Phase 6** で着手。全体の工程は **`docs/phase6_plan.md`** を参照。
 
-**前提**: `summarizer/` は未実装。行の投入は現状 **手動 SQL** または Phase 6 の `generate.py` を想定。
+**前提**: 週次の自動投入は `./venv/bin/python -m summarizer.generate --period week --date YYYY-Www`（`summarizer/generate.py`。システム `python3` には `psycopg2` が無いことが多い）。月次・バッチ・Neocities は未実装。
 
 ---
 
