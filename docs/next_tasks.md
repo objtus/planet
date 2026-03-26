@@ -44,9 +44,11 @@
 
 **マスタープラン: [`docs/phase6_plan.md`](phase6_plan.md)**（マイルストーン M1〜M6、データ契約、完了定義）
 
+**階層要約（日→週→月→年）の設計・実装手順: [`docs/hierarchical_summary_plan.md`](hierarchical_summary_plan.md)** — 長い digest 問題の先送りではなく、こちらを優先して週次から段階的に移行する想定。
+
 概要:
 
-1. ~~Ollama サマリー（`summarizer/generate.py`）— 週次 CLI~~ **M1 済**: `./venv/bin/python -m summarizer.generate --period week --date YYYY-Www`
+1. ~~Ollama サマリー（`summarizer/generate.py`）— 週次 CLI~~ **M1 済**: `./venv/bin/python -m summarizer.generate --period week --date YYYY-Www`（**既定 `--pipeline hierarchical`**＝日次7+週マージ1。従来一括は `--pipeline flat`）
 2. ~~**月次 CLI（M2）**~~ **済**: `./venv/bin/python -m summarizer.generate --period month --date YYYY-MM`（詳細は `phase6_plan.md`）
 3. 過去分一括生成（バッチ）
 4. Neocities HTML テンプレート + アップロード（`publisher/`）
@@ -93,6 +95,6 @@
 
 **最初に読む:** `overview.md` → `current_state.md` → **このファイル**
 
-**Phase 6 実装時:** **`docs/phase6_plan.md`** → `design.md` §7–8、`summary_integration_plan.md`
+**Phase 6 実装時:** **`docs/phase6_plan.md`** → `design.md` §7–8、`summary_integration_plan.md` → 階層パイプラインは **`docs/hierarchical_summary_plan.md`**
 
 **必要に応じて:** `dashboard_ui.md`, `iphone_shortcuts.md`, `importers.md`, `docs/api/*.md`

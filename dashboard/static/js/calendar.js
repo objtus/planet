@@ -826,8 +826,47 @@ window.goToMonthFromSummary = function(year, monthIndex) {
   void refreshCalWithHeat().then(() => loadMonth());
 };
 
+/**
+ * @param {Response} response
+ * @param {(o: object) => void} onProgress
+ * @returns {Promise<object|null>}
+ */
+async function consumeNdjsonSummaryStream(response, onProgress) {
+  const reader = response.body && response.body.getReader();
+  if (!reader) return null;
+  const dec = new TextDecoder();
+  let buf = '';
+  /** @type {object|null} */
+  let lastDone = null;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    const parts = buf.split('\n');
+    buf = parts.pop() || '';
+    for (const line of parts) {
+      const t = line.trim();
+      if (!t) continue;
+      try {
+        const o = JSON.parse(t);
+        if (o.type === 'progress') onProgress(o);
+        if (o.type === 'done') lastDone = o;
+      } catch (_) { /* 行途中などは無視 */ }
+    }
+  }
+  const tail = buf.trim();
+  if (tail) {
+    try {
+      const o = JSON.parse(tail);
+      if (o.type === 'done') lastDone = o;
+    } catch (_) { /* ignore */ }
+  }
+  return lastDone;
+}
+
 async function onSummaryGenerateClick() {
   const btn = document.getElementById('summary-generate-btn');
+  const progEl = document.getElementById('summary-generate-progress');
   if (!btn || btn.hidden || btn.disabled) return;
   const period = btn.dataset.period;
   const date = btn.dataset.date;
@@ -837,29 +876,65 @@ async function onSummaryGenerateClick() {
   btn.disabled = true;
   const orig = btn.textContent;
   btn.textContent = '生成中…';
+  if (progEl) {
+    progEl.hidden = false;
+    progEl.textContent = '開始しています…';
+  }
 
   const ctrl = new AbortController();
-  const abortTid = setTimeout(() => ctrl.abort(), 900000);
+  const abortTid = setTimeout(() => ctrl.abort(), 3600000);
 
   try {
     const r = await fetch('/api/summaries/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ period, date }),
+      body: JSON.stringify({ period, date, stream: true }),
       signal: ctrl.signal,
     });
-    let j = {};
-    try {
-      j = await r.json();
-    } catch (_) { /* ignore */ }
+    const ct = (r.headers.get('content-type') || '').toLowerCase();
+
     if (!r.ok) {
+      let j = {};
+      try {
+        j = await r.json();
+      } catch (_) { /* ignore */ }
       alert(j.error || `生成に失敗しました（${r.status}）`);
       return;
     }
-    if (j.skipped) {
-      alert(j.message || 'この期間のログがなく、生成をスキップしました。');
-      return;
+
+    if (ct.includes('ndjson') && r.body) {
+      const done = await consumeNdjsonSummaryStream(r, (o) => {
+        if (progEl && o.message != null && o.step != null && o.total != null) {
+          progEl.textContent = `現在 ${o.message}（${o.step}/${o.total}）`;
+        }
+      });
+      if (!done || done.type !== 'done') {
+        alert('応答が不完全でした');
+        return;
+      }
+      if (!done.ok) {
+        alert(done.error || '生成に失敗しました');
+        return;
+      }
+      if (done.skipped) {
+        alert(done.message || 'この期間のログがなく、生成をスキップしました。');
+        return;
+      }
+    } else {
+      let j = {};
+      try {
+        j = await r.json();
+      } catch (_) { /* ignore */ }
+      if (j.skipped) {
+        alert(j.message || 'この期間のログがなく、生成をスキップしました。');
+        return;
+      }
+      if (!j.ok) {
+        alert(j.error || '生成に失敗しました');
+        return;
+      }
     }
+
     const sumPayload = await fetchSummaryPayload(period, date);
     renderSummaryPanelWeekOrMonth(viewKind, sumPayload, date);
   } catch (e) {
@@ -872,6 +947,10 @@ async function onSummaryGenerateClick() {
     clearTimeout(abortTid);
     btn.disabled = false;
     btn.textContent = orig;
+    if (progEl) {
+      progEl.hidden = true;
+      progEl.textContent = '';
+    }
   }
 }
 

@@ -4,6 +4,8 @@
 
 **前提**: Phase 5 のダッシュボードは機能完成扱い。`summaries` の閲覧・カレンダー連携・公開トグル・`GET /api/summary` は実装済み（契約は `docs/summary_integration_plan.md`）。本フェーズでは **行の自動生成** と **Neocities への反映** を追加する。
 
+**階層要約（日→週→月→年）**: 週次の **1 本あたりプロンプト肥大**や将来の月次・年次を見据えたパイプラインは **`docs/hierarchical_summary_plan.md`** に集約。M1 の「生ログ一括」方式と併存・移行する想定。
+
 ---
 
 ## 1. ゴールと非ゴール
@@ -46,7 +48,8 @@
 
 2. **入力（コンテキスト）**  
    - 指定期間の `logs`（`is_deleted=FALSE`）を時系列で取得。ソース種別に応じて `content`・`metadata`・関連テーブルから要約用の平文を組み立てる。  
-   - 件数上限・トークン上限を見積もり、超える場合は直近優先やセクション別サンプリング（実装コメントで方針を残す）。
+   - 件数上限・トークン上限を見積もり、超える場合は直近優先やセクション別サンプリング（実装コメントで方針を残す）。  
+   - **週次**: `--pipeline flat`（生ログ一括・日別均等サンプル）と **`--pipeline hierarchical`（既定）** の **日次7回→週マージ1回** を `summarizer/generate.py` で選択可能。詳細は **`docs/hierarchical_summary_plan.md`**。
 
 3. **Ollama**  
    - HTTP: `POST http://<host>:11434/api/generate`（または chat API。モデルが chat 専用ならそちら）。  

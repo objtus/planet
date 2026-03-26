@@ -1,15 +1,18 @@
 """Planet ダッシュボード Flask アプリ (Phase 5)"""
 
+import json
 import os
-import sys
+import queue
 import subprocess
+import sys
+import threading
 from calendar import monthrange
 import tomllib
 import psycopg2
 from pathlib import Path
 from datetime import datetime, timezone, timedelta, date
 
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, Response, jsonify, render_template, request, stream_with_context
 
 ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT))
@@ -718,6 +721,7 @@ def create_app():
         data = request.get_json(silent=True) or {}
         period = (data.get("period") or "").strip().lower()
         date_arg = (data.get("date") or "").strip()
+        want_stream = bool(data.get("stream"))
         if period not in ("week", "month") or not date_arg:
             return jsonify({"error": "period (week|month) と date が必要です"}), 400
 
@@ -742,7 +746,6 @@ def create_app():
         if not py_exe.is_file():
             return jsonify({"error": "venv/bin/python が見つかりません"}), 500
 
-        env = {**os.environ, "PYTHONPATH": str(ROOT)}
         cmd = [
             str(py_exe),
             "-m",
@@ -751,18 +754,129 @@ def create_app():
             period,
             "--date",
             norm_date,
+            "--pipeline",
+            "hierarchical",
         ]
+        env_base = {**os.environ, "PYTHONPATH": str(ROOT)}
+        gen_timeout = 3600
+
+        if want_stream:
+            env_stream = {
+                **env_base,
+                "PLANET_SUMMARY_PROGRESS_MACHINE": "1",
+            }
+
+            @stream_with_context
+            def ndjson_stream():
+                proc = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    bufsize=1,
+                    cwd=str(ROOT),
+                    env=env_stream,
+                )
+                q: queue.Queue[str | None] = queue.Queue()
+                stderr_buf: list[str] = []
+
+                def pump_stderr() -> None:
+                    try:
+                        for line in iter(proc.stderr.readline, ""):
+                            stderr_buf.append(line)
+                            q.put(line.rstrip("\n"))
+                    finally:
+                        q.put(None)
+
+                threading.Thread(target=pump_stderr, daemon=True).start()
+                while True:
+                    line = q.get()
+                    if line is None:
+                        break
+                    prefix = "__PLANET_PROGRESS__ "
+                    if line.startswith(prefix):
+                        try:
+                            payload = json.loads(line[len(prefix) :])
+                            payload["type"] = "progress"
+                            yield json.dumps(payload, ensure_ascii=False) + "\n"
+                        except (json.JSONDecodeError, TypeError, ValueError):
+                            pass
+                rc = proc.wait()
+                stdout = (proc.stdout.read() or "").strip()
+                stderr_full = "".join(stderr_buf)
+                if rc == 0:
+                    if (
+                        "ログが 0 件のためスキップ" in stderr_full
+                        or "スキップします" in stderr_full
+                    ):
+                        msg = (
+                            stderr_full[-500:]
+                            if stderr_full
+                            else "この期間のログがありません。"
+                        )
+                        yield json.dumps(
+                            {
+                                "type": "done",
+                                "ok": True,
+                                "skipped": True,
+                                "message": msg,
+                            },
+                            ensure_ascii=False,
+                        ) + "\n"
+                    elif "保存しました" in stdout:
+                        yield json.dumps(
+                            {"type": "done", "ok": True, "skipped": False},
+                            ensure_ascii=False,
+                        ) + "\n"
+                    else:
+                        yield json.dumps(
+                            {
+                                "type": "done",
+                                "ok": True,
+                                "skipped": False,
+                                "output": stdout[-400:] if stdout else "",
+                            },
+                            ensure_ascii=False,
+                        ) + "\n"
+                else:
+                    err_tail = (
+                        (stderr_full or stdout or "生成に失敗しました")[-1200:]
+                    )
+                    status_code = 400 if rc == 2 else 500
+                    yield json.dumps(
+                        {
+                            "type": "done",
+                            "ok": False,
+                            "error": err_tail,
+                            "code": rc,
+                            "http_status": status_code,
+                        },
+                        ensure_ascii=False,
+                    ) + "\n"
+
+            return Response(
+                ndjson_stream(),
+                mimetype="application/x-ndjson; charset=utf-8",
+            )
+
         try:
             result = subprocess.run(
                 cmd,
                 capture_output=True,
                 text=True,
-                timeout=900,
+                timeout=gen_timeout,
                 cwd=str(ROOT),
-                env=env,
+                env=env_base,
             )
         except subprocess.TimeoutExpired:
-            return jsonify({"error": "タイムアウト（900秒）。Ollama の応答を確認してください。"}), 504
+            return (
+                jsonify(
+                    {
+                        "error": f"タイムアウト（{gen_timeout}秒）。Ollama の応答を確認してください。",
+                    }
+                ),
+                504,
+            )
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
