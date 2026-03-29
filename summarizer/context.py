@@ -72,6 +72,20 @@ def fetch_activity_digest(
     return "\n".join(lines)
 
 
+def fetch_scrapbox_diary(conn, day: date) -> str | None:
+    """指定日の Scrapbox 日記（自分のセクション・記法除去済み）を返す。なければ None。"""
+    page_title = day.strftime("%Y/%m/%d")
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT content_plain FROM scrapbox_pages WHERE page_title = %s AND content_plain != ''",
+            (page_title,)
+        )
+        row = cur.fetchone()
+    if not row or not row[0].strip():
+        return None
+    return row[0].strip()
+
+
 def fetch_activity_digest_for_day(
     conn,
     day: date,
@@ -79,7 +93,9 @@ def fetch_activity_digest_for_day(
     max_lines: int = MAX_LOG_LINES_DAILY,
     preview_limit: int | None = None,
 ) -> str:
-    """JST の 1 暦日（0:00〜翌日未満）の logs を時系列昇順で最大 max_lines 件。"""
+    """JST の 1 暦日（0:00〜翌日未満）の logs を時系列昇順で最大 max_lines 件。
+    Scrapbox 日記がある場合は末尾にセクションとして追加する。
+    """
     limit = (
         CONTENT_PREVIEW_CHARS_DAILY if preview_limit is None else preview_limit
     )
@@ -104,6 +120,11 @@ def fetch_activity_digest_for_day(
         line = _format_digest_line(*row, preview_limit=limit)
         if line:
             lines.append(line)
+
+    diary = fetch_scrapbox_diary(conn, day)
+    if diary:
+        lines.append(f"\n--- Scrapbox日記 ---\n{diary}")
+
     return "\n".join(lines)
 
 

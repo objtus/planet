@@ -38,6 +38,11 @@ channel_id = "YOUR_CHANNEL_ID"
 [rss]
 url = "https://yuinoid.neocities.org/rss.xml"
 
+[scrapbox]
+project       = "stall"
+my_icons      = ["health.icon"]
+lookback_days = 30
+
 [neocities]
 api_key = "YOUR_NEOCITIES_API_KEY"
 

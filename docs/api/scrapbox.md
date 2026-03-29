@@ -306,12 +306,12 @@ Scrapbox日記は `logs` に1日1行として保存する（upsert）。
 
 ## 実装チェックリスト
 
-- [ ] `db/migrate_scrapbox.sql` — `scrapbox_pages` テーブル作成 + `data_sources` 1行追加
-- [ ] `config/settings.toml` — `[scrapbox]` ブロックを手動追記
-- [ ] `config/settings.toml.example` — `[scrapbox]` のダミー値を追加
-- [ ] `collectors/scrapbox.py` — 収集スクリプト（`sync_diary_pages` + `extract_my_entries` 実装）
-- [ ] `cron/crontab.txt` — 毎日 AM 6:00 に追記
-- [ ] サマリー統合（`summarizer/context.py` に `fetch_scrapbox_diary` 追加）
+- [x] `db/migrate_scrapbox.sql` — `scrapbox_pages` テーブル作成 + `data_sources` 1行追加（source_id=17）
+- [x] `config/settings.toml` — `[scrapbox]` ブロックを追記
+- [x] `config/settings.toml.example` — `[scrapbox]` のダミー値を追加
+- [x] `collectors/scrapbox.py` — 収集スクリプト実装・動作確認済み
+- [x] `cron/crontab.txt` — 毎日 AM 6:20 に追記
+- [x] サマリー統合（`summarizer/context.py` に `fetch_scrapbox_diary` 追加・日次 digest 末尾に統合）
 
 ---
 
