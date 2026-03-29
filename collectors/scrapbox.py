@@ -135,6 +135,23 @@ class ScrapboxCollector(BaseCollector):
 
             content_plain = extract_my_entries(raw_text, my_icons)
 
+            # 自分の記述がない日は登録しない。既存レコードがあれば削除する
+            if not content_plain:
+                if row:  # 以前は内容があったが今は空になった場合
+                    self.cur.execute(
+                        "SELECT log_id FROM scrapbox_pages WHERE project=%s AND page_title=%s",
+                        (project, page_title)
+                    )
+                    sp_row = self.cur.fetchone()
+                    if sp_row and sp_row[0]:
+                        self.cur.execute("DELETE FROM logs WHERE id=%s", (sp_row[0],))
+                    self.cur.execute(
+                        "DELETE FROM scrapbox_pages WHERE project=%s AND page_title=%s",
+                        (project, page_title)
+                    )
+                    print(f"  {page_title}: 記述なし → 削除")
+                continue
+
             # logsのtimestamp: ページ日付のJST 00:00をUTCに変換
             jst = datetime.timezone(datetime.timedelta(hours=9))
             ts  = datetime.datetime(d.year, d.month, d.day, 0, 0, 0, tzinfo=jst)
