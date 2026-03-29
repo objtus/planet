@@ -272,10 +272,46 @@ lookback_days = 30
 
 ---
 
+## logsテーブル連携
+
+Scrapbox日記は `logs` に1日1行として保存する（upsert）。
+
+| logs カラム | 値 |
+|---|---|
+| `source_id` | data_sources の Scrapbox 行の id |
+| `original_id` | `stall/2026/03/25`（`project/page_title`） |
+| `content` | 抽出済みプレーンテキスト（自分のセクションのみ・記法除去済み） |
+| `url` | `https://scrapbox.io/stall/2026%2F03%2F25`（スラッシュエンコード済み） |
+| `timestamp` | ページ日付の JST 00:00 を UTC に変換（例: 2026-03-25 15:00:00+00:00） |
+| `metadata` | `{"page_title": "2026/03/25", "scrapbox_updated": 1742947200}` |
+
+ページが追記更新された場合は `ON CONFLICT (source_id, original_id) DO UPDATE` で上書き。
+
+---
+
 ## 収集頻度
 
 - `cron`: 毎日 AM 6:00（サマリー生成前に実行）
 - 直近30日分をチェック（追記対応）
+
+---
+
+## サマリーコンテキストへの統合
+
+`summarizer/context.py` の `fetch_activity_digest_for_day` に Scrapbox 日記を追加する。
+`logs` から当日の scrapbox 行を取得して digest に含める（他のソースと同様）。
+日記がある日はサマリーの文脈・気持ちが補完される。
+
+---
+
+## 実装チェックリスト
+
+- [ ] `db/migrate_scrapbox.sql` — `scrapbox_pages` テーブル作成 + `data_sources` 1行追加
+- [ ] `config/settings.toml` — `[scrapbox]` ブロックを手動追記
+- [ ] `config/settings.toml.example` — `[scrapbox]` のダミー値を追加
+- [ ] `collectors/scrapbox.py` — 収集スクリプト（`sync_diary_pages` + `extract_my_entries` 実装）
+- [ ] `cron/crontab.txt` — 毎日 AM 6:00 に追記
+- [ ] サマリー統合（`summarizer/context.py` に `fetch_scrapbox_diary` 追加）
 
 ---
 

@@ -4,7 +4,7 @@
 
 週次を **階層パイプライン**（`--pipeline hierarchical`）で生成するときの日次要約を `summaries` に保存し、カレンダー日ビューとサマリー一覧から辿れるようにする設計。
 
-**関連**: [`summary_integration_plan.md`](summary_integration_plan.md)、[`hierarchical_summary_plan.md`](hierarchical_summary_plan.md)、`summarizer/generate.py`
+**関連**: `docs/phase6_plan.md`（Phase 6 全体）、`summarizer/generate.py`
 
 ---
 

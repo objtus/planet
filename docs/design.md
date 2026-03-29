@@ -94,6 +94,7 @@ pg_dump → gzip → rclone → pCloud（週1回 cron）
 | GitHub | 開発活動 | （アカウント設定）| 1日1回 | △（統計のみ）|
 | iPhone ヘルス | 歩数・カロリー・心拍数・運動/スタンド | HealthKit → Flask | 1日1回（夜）| ✗ |
 | iPhone 写真 | 撮影メタデータ（日時・位置）| HealthKit → Flask | 1日1回（夜）| ✗ |
+| Cosense (Scrapbox) | 日記（stallプロジェクト）| scrapbox.io API | 1日1回 | ✗ |
 | 過去 JSON | 一括インポート | Misskey・Twitter エクスポート | 初回のみ | ○（SNS分）|
 
 ※公開列: ○=Planetページに表示 △=統計のみダッシュボード表示 ✗=非公開
