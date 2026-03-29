@@ -180,8 +180,16 @@
 
 ### M6 — 自動実行（最小）
 
-- `design.md` §7: 週次（前週・月曜朝）、月次（前月・1 日朝）、Neocities（1 日 1 回など）。  
+- `design.md` §7: 週次（前週・月曜朝）、月次（前月・1 日朝）、Neocities（1 日 1 回など）。
 - 完全な cron 整理は Phase 7 に任せ、Phase 6 では **推奨 crontab 断片**を `docs/phase6_plan.md` 末尾または `cron/crontab.txt` に追記する程度でよい。
+
+### 将来：年次要約
+
+- `period_type='yearly'`、`period_start=YYYY-01-01`（UNIQUE 制約のまま表現可能）。
+- **入力**: その年の月次要約 12 本のみ（生ログは使わない）。
+- プロンプト: `prompts/yearly_from_monthlies.txt`（新規）。
+- ダッシュボード年ビューのサマリーパネルと `GET /api/summary?period=year&date=YYYY` に接続。
+- 週が月をまたぐ重複は月次プロンプト内で許容済み（年次は月次を束ねるだけなので影響なし）。
 
 ---
 
@@ -209,10 +217,10 @@
 | 文書 | 用途 |
 |------|------|
 | `docs/design.md` §7–8 | 生成タイミング・スタイル・公開範囲 |
-| `docs/summary_integration_plan.md` | DB・API・カレンダーとの契約 |
+| `docs/summary_daily_and_dashboard.md` | 日次要約・ダッシュボード連携の仕様 |
 | `docs/api/neocities.md` | アップロード API |
 | `db/schema.sql` | `summaries` 定義 |
-| `docs/next_tasks.md` | フェーズ全体の位置づけ |
+| `docs/current_state.md` | フェーズ全体の位置づけ・次タスク |
 
 ---
 

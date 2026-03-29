@@ -88,12 +88,8 @@ planet/
 
 ---
 
-## 現在の状態
+## 現在の状態・次のタスク
 
 → `docs/current_state.md` を参照
-
-## 次のタスク
-
-→ `docs/next_tasks.md` を参照
 
 Phase 6（AI 生成・Neocities）の実装手順 → **`docs/phase6_plan.md`**
