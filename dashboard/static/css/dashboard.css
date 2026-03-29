@@ -915,6 +915,7 @@ select {
 
 .tl-content { flex: 1; min-width: 0; }
 .tl-text { font-size: 13px; color: var(--color-text-primary); line-height: 1.5; word-break: break-word; }
+.tl-text-diary { line-height: 1.7; }
 .tl-sub  { font-size: 11px; color: var(--color-text-secondary); margin-top: 1px; word-break: break-word; }
 .tl-time { font-size: 11px; color: var(--color-text-tertiary); margin-top: 2px; }
 

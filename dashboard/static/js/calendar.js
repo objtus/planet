@@ -1283,6 +1283,8 @@ function renderTimeline(entries, mode) {
     } else if (e.is_boost && e.content) {
       const prefix = source?.type === 'mastodon' ? 'BT' : 'RN';
       mainHTML = `<div class="tl-sub">${prefix}: ${esc(e.content)}</div>`;
+    } else if (source?.type === 'scrapbox') {
+      mainHTML = `<div class="tl-text tl-text-diary">${esc(e.content).replace(/\n/g, '<br>')}</div>`;
     } else {
       mainHTML = `<div class="tl-text">${esc(e.content)}</div>`;
     }

@@ -25,11 +25,26 @@ def strip_scrapbox_notation(text: str) -> str:
     return text.strip()
 
 
+def _measure_indent(line: str) -> int:
+    """行頭の空白量を返す（全角スペースは2、半角スペース・タブは1として計算）"""
+    count = 0
+    for ch in line:
+        if ch in (' ', '\t'):
+            count += 1
+        elif ch == '\u3000':  # 全角スペース
+            count += 2
+        else:
+            break
+    return count
+
+
 def extract_my_entries(text: str, my_icons: list) -> str:
-    """自分のアイコン行から次のアイコン行までの全行を抽出する"""
+    """自分のアイコン行から次のアイコン行までの全行を抽出する。
+    インデントの相対レベルをリスト記法（・）で表現する。
+    """
     lines = text.split("\n")
-    my_sections = []
     in_my_section = False
+    raw_lines = []  # (indent_count, clean_text)
 
     for line in lines:
         stripped = line.strip()
@@ -45,11 +60,24 @@ def extract_my_entries(text: str, my_icons: list) -> str:
         if in_my_section:
             if NAV_PATTERN.match(stripped):
                 continue
+            if not stripped:
+                continue
             clean = strip_scrapbox_notation(stripped)
             if clean:
-                my_sections.append(clean)
+                raw_lines.append((_measure_indent(line), clean))
 
-    return "\n".join(my_sections).strip()
+    if not raw_lines:
+        return ""
+
+    # 最小インデントをベースとし、相対レベルを計算してリスト記法に変換
+    base = min(c for c, _ in raw_lines)
+    result = []
+    for indent, clean in raw_lines:
+        level = max(0, indent - base)
+        prefix = "　" * level + ("・" if level > 0 else "")
+        result.append(f"{prefix}{clean}")
+
+    return "\n".join(result)
 
 
 class ScrapboxCollector(BaseCollector):
