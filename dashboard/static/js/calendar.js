@@ -1179,6 +1179,13 @@ function esc(s) {
   return (s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+function linkify(s) {
+  return esc(s).replace(
+    /https?:\/\/[^\s\u3000\uff01-\uff60\u300c-\u300f"'<>()[\]{}]+/g,
+    u => `<a href="${u}" target="_blank" rel="noopener">${u}</a>`
+  );
+}
+
 // =========================================================
 // ライトボックス
 // =========================================================
@@ -1279,24 +1286,19 @@ function renderTimeline(entries, mode) {
 
     let mainHTML;
     if (e.cw) {
-      mainHTML = `<details><summary>${esc(e.cw)}</summary><div class="tl-text">${esc(e.content)}</div></details>`;
+      mainHTML = `<details><summary>${esc(e.cw)}</summary><div class="tl-text">${linkify(e.content)}</div></details>`;
     } else if (e.is_boost && e.content) {
       const prefix = source?.type === 'mastodon' ? 'BT' : 'RN';
-      mainHTML = `<div class="tl-sub">${prefix}: ${esc(e.content)}</div>`;
+      mainHTML = `<div class="tl-sub">${prefix}: ${linkify(e.content)}</div>`;
     } else if (source?.type === 'scrapbox') {
-      mainHTML = `<div class="tl-text tl-text-diary">${esc(e.content).replace(/\n/g, '<br>')}</div>`;
+      mainHTML = `<div class="tl-text tl-text-diary">${linkify(e.content).replace(/\n/g, '<br>')}</div>`;
     } else {
-      mainHTML = `<div class="tl-text">${esc(e.content)}</div>`;
+      mainHTML = `<div class="tl-text">${linkify(e.content)}</div>`;
     }
 
     const timeLabel = (mode === 'week' || mode === 'month' || mode === 'year')
       ? `${e.date.slice(5)} ${e.time}`
       : e.time;
-
-    const linkHTML = e.url
-      ? ` <a href="${esc(e.url)}" target="_blank" rel="noopener"
-              style="color:var(--color-text-info);font-size:10px">↗</a>`
-      : '';
 
     // メディアフラグ（data 属性で applyFilter から参照）
     const mediaMark = e.has_media ? ' data-media="1"' : '';
@@ -1311,9 +1313,11 @@ function renderTimeline(entries, mode) {
     return `<div class="tl-item" data-src="${e.source_id}"${mediaMark}>
       ${badge}
       <div class="tl-content">
-        ${mainHTML}${linkHTML}
+        ${mainHTML}
         ${mediaSection}
-        <div class="tl-time">${timeLabel}</div>
+        ${e.url
+          ? `<a class="tl-time" href="${esc(e.url)}" target="_blank" rel="noopener">${timeLabel}</a>`
+          : `<div class="tl-time">${timeLabel}</div>`}
       </div>
     </div>`;
   }).join('');
