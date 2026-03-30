@@ -6,60 +6,41 @@
   python collect_all.py sns      # Misskey + Mastodon
 """
 
+import importlib
 import sys
 
+# 実行順を保持した (モジュールパス, クラス名) のマッピング
+COLLECTORS = {
+    "misskey":  ("collectors.misskey",   "MisskeyCollector"),
+    "mastodon": ("collectors.mastodon",  "MastodonCollector"),
+    "lastfm":   ("collectors.lastfm",    "LastfmCollector"),
+    "weather":  ("collectors.weather",   "WeatherCollector"),
+    "github":   ("collectors.github",    "GithubCollector"),
+    "rss":      ("collectors.rss",       "RssCollector"),
+    "youtube":  ("collectors.youtube",   "YoutubeCollector"),
+}
+
+# グループエイリアス
+GROUPS = {
+    "sns": {"misskey", "mastodon"},
+}
+
+
 def run(targets):
-    if "misskey" in targets or "sns" in targets or "all" in targets:
-        from collectors.misskey import MisskeyCollector
-        c = MisskeyCollector()
-        try:
-            c.collect()
-        finally:
-            c.close()
+    active = set()
+    for t in targets:
+        if t == "all":
+            active.update(COLLECTORS)
+        elif t in GROUPS:
+            active.update(GROUPS[t])
+        elif t in COLLECTORS:
+            active.add(t)
 
-    if "mastodon" in targets or "sns" in targets or "all" in targets:
-        from collectors.mastodon import MastodonCollector
-        c = MastodonCollector()
-        try:
-            c.collect()
-        finally:
-            c.close()
-
-    if "lastfm" in targets or "all" in targets:
-        from collectors.lastfm import LastfmCollector
-        c = LastfmCollector()
-        try:
-            c.collect()
-        finally:
-            c.close()
-
-    if "weather" in targets or "all" in targets:
-        from collectors.weather import WeatherCollector
-        c = WeatherCollector()
-        try:
-            c.collect()
-        finally:
-            c.close()
-
-    if "github" in targets or "all" in targets:
-        from collectors.github import GithubCollector
-        c = GithubCollector()
-        try:
-            c.collect()
-        finally:
-            c.close()
-
-    if "rss" in targets or "all" in targets:
-        from collectors.rss import RssCollector
-        c = RssCollector()
-        try:
-            c.collect()
-        finally:
-            c.close()
-
-    if "youtube" in targets or "all" in targets:
-        from collectors.youtube import YoutubeCollector
-        c = YoutubeCollector()
+    for name, (module_path, class_name) in COLLECTORS.items():
+        if name not in active:
+            continue
+        cls = getattr(importlib.import_module(module_path), class_name)
+        c = cls()
         try:
             c.collect()
         finally:

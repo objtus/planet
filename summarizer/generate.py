@@ -54,24 +54,8 @@ from summarizer.week_bounds import parse_iso_week_date, week_label, week_utc_ran
 _PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
 
 
-def _load_weekly_template() -> str:
-    return (_PROMPTS_DIR / "weekly_hybrid.txt").read_text(encoding="utf-8")
-
-
-def _load_weekly_from_dailies_template() -> str:
-    return (_PROMPTS_DIR / "weekly_from_dailies.txt").read_text(encoding="utf-8")
-
-
-def _load_daily_template() -> str:
-    return (_PROMPTS_DIR / "daily_hybrid.txt").read_text(encoding="utf-8")
-
-
-def _load_monthly_template() -> str:
-    return (_PROMPTS_DIR / "monthly_hybrid.txt").read_text(encoding="utf-8")
-
-
-def _load_monthly_from_weeklies_template() -> str:
-    return (_PROMPTS_DIR / "monthly_from_weeklies.txt").read_text(encoding="utf-8")
+def _load_template(name: str) -> str:
+    return (_PROMPTS_DIR / f"{name}.txt").read_text(encoding="utf-8")
 
 
 def _build_weekly_prompt(template: str, *, week_label_text: str, digest: str) -> str:
@@ -416,7 +400,7 @@ def _run_day(
         print(f"ログが 0 件のためスキップします: {day_label}", file=sys.stderr)
         return 0
 
-    tmpl = _load_daily_template()
+    tmpl = _load_template("daily_hybrid")
     prompt = _build_daily_prompt(tmpl, day_label=day_label, digest=digest)
 
     if dry_run:
@@ -509,7 +493,7 @@ def _run_week_flat(
         + digest
     )
 
-    template = _load_weekly_template()
+    template = _load_template("weekly_hybrid")
     prompt = _build_weekly_prompt(template, week_label_text=label, digest=digest)
 
     if dry_run:
@@ -570,8 +554,8 @@ def _run_week_hierarchical(
         print(f"ログが 0 件のためスキップします: {label}", file=sys.stderr)
         return 0
 
-    daily_tmpl = _load_daily_template()
-    merge_tmpl = _load_weekly_from_dailies_template()
+    daily_tmpl = _load_template("daily_hybrid")
+    merge_tmpl = _load_template("weekly_from_dailies")
 
     if dry_run:
         if args.dry_run_daily:
@@ -739,7 +723,7 @@ def _run_month_flat(
         print(f"ログが 0 件のためスキップします: {label}", file=sys.stderr)
         return 0
 
-    template = _load_monthly_template()
+    template = _load_template("monthly_hybrid")
     prompt = _build_monthly_prompt(template, month_label_text=label, digest=digest)
 
     if dry_run:
@@ -798,7 +782,7 @@ def _run_month_hierarchical(
         )
 
     block = _format_weekly_summaries_block(rows)
-    template = _load_monthly_from_weeklies_template()
+    template = _load_template("monthly_from_weeklies")
     prompt = _build_monthly_from_weeklies_prompt(
         template, month_label_text=label, weekly_summaries=block
     )
