@@ -128,7 +128,8 @@ CREATE TABLE data_sources (
     name        TEXT NOT NULL,          -- 表示名 例: 'misskey.io @yuinoid'
     type        TEXT NOT NULL,          -- 'misskey' / 'mastodon' / 'lastfm' /
                                         -- 'weather' / 'github' / 'youtube' /
-                                        -- 'rss' / 'health' / 'photo'
+                                        -- 'rss' / 'health' / 'photo' /
+                                        -- 'netflix' / 'prime' / …
     base_url    TEXT,                   -- 'https://misskey.io'
     account     TEXT,                   -- '@yuinoid'
     config      JSONB,                  -- APIキー・インスタンス固有設定等
@@ -284,8 +285,30 @@ CREATE TABLE health_daily (
     heart_rate_min      INT,
     exercise_minutes    INT,
     stand_hours         INT,
+    screen_time_seconds INT,        -- Jomo 経由の1日合計（秒）
     photo_count         INT DEFAULT 0,
     photo_locations     JSONB
+);
+```
+
+### 5-8b. streaming_views テーブル
+
+Netflix / Prime Video の視聴履歴 CSV インポート用。`logs` と 1:1（`log_id` UNIQUE）。
+
+```sql
+CREATE TABLE streaming_views (
+    id                   BIGSERIAL PRIMARY KEY,
+    log_id               BIGINT NOT NULL UNIQUE REFERENCES logs(id) ON DELETE CASCADE,
+    source_id            INT NOT NULL REFERENCES data_sources(id),
+    provider             TEXT NOT NULL CHECK (provider IN ('netflix', 'prime')),
+    title                TEXT NOT NULL,
+    episode_title        TEXT,
+    watched_on           DATE NOT NULL,
+    watched_at           TIMESTAMPTZ NOT NULL,
+    content_kind         TEXT,
+    external_series_id   TEXT,
+    external_episode_id  TEXT,
+    metadata             JSONB
 );
 ```
 
@@ -356,7 +379,7 @@ CREATE TABLE summaries (
 | 画面 | パス | 概要 |
 |---|---|---|
 | カレンダー | `/` | メイン。ヒートマップカレンダーから日/週/月/年を選択 |
-| 検索 | `/search` | 全文検索＋ソース・日付範囲フィルター |
+| 検索 | `/search` | キーワード（`logs.content` 部分一致）＋ソース・日付範囲。結果の日時はカレンダー日ビュー（`?view=day&date=`）へリンク。Last.fm は行からソフト削除可（`POST /api/logs/<id>/soft-delete`、カレンダーと同 API） |
 | サマリー一覧 | `/summaries` | 週次・月次サマリー一覧・公開管理 |
 | 統計 | `/stats` | グラフ・集計ビュー |
 | ソース管理 | `/sources` | データソースの追加・編集・有効/無効切り替え |

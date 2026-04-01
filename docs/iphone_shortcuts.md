@@ -95,6 +95,37 @@
 
 ---
 
+## ショートカット 3: Jomo スクリーンタイム（毎日 23:10 など）
+
+[Jomo](https://jomo.so/) の「Get today's screen time」アクションで取得した**秒数（整数）**を送信する。
+
+### アクション構成（例）
+
+| # | アクション | 設定 |
+|---|---|---|
+| 1 | **Get today's screen time**（Jomo） | → 変数 `seconds` |
+| 2 | **日付を書式設定** | 現在の日付 / カスタム: `yyyy-MM-dd` → 変数 `today` |
+| 3 | **辞書** | 下記参照 |
+| 4 | **URLのコンテンツを取得** | POST / JSON / 辞書を指定 |
+
+### 辞書の内容
+
+| キー | 種類 | 値 |
+|---|---|---|
+| `source` | テキスト | `screen_time` |
+| `date` | テキスト | 変数 `today`（`yyyy-MM-dd` 推奨） |
+| `screen_time_seconds` | 数字 | 変数 `seconds`（Jomo の返り値） |
+
+- `date` に ISO 日時（例: `2026-03-31T12:02:16+09:00`）を渡しても、サーバー側で **JST の暦日** に正規化して `logs.original_id` / `health_daily.date` に使う。
+- エンドポイントはショートカット 1 と同じ `POST .../api/ingest` でよい。
+- 「Share Across Devices」をオフにしないと、複数デバイスの合算になる（Apple の挙動）。
+
+### 自動実行
+
+「オートメーション」→ 時刻: **23:10 / 毎日**（ヘルス送信の直後など）→ 「実行前に確認」を**オフ**
+
+---
+
 ## API 仕様（実装済み）
 
 ### ヘルスデータ
@@ -115,6 +146,22 @@
 
 - `active_calories` は小数でも整数に丸めて保存
 - `date` の代わりに `dates` を送っても受け付ける（ショートカット設定の typo 対応）
+
+### Jomo スクリーンタイム
+
+```json
+{
+  "source": "screen_time",
+  "date": "2026-03-30",
+  "screen_time_seconds": 18000
+}
+```
+
+- `screen_time_seconds` は 0〜172800（2日分まで）の整数
+- `date` は `YYYY-MM-DD` 推奨。ISO 日時でも可（サーバーが JST の日付に正規化）
+- DB: `data_sources.type = 'screen_time'` のソースに紐づく `logs` 1件／日と、`health_daily.screen_time_seconds` の更新（日付キーでマージ）
+
+**DB マイグレーション**（初回のみ）: `sudo -u postgres psql -d planet < db/migrate_jomo_screen_time.sql`（リポジトリルートから。`-f` でホーム配下を渡すと `postgres` が読めず Permission denied になりやすい）
 
 ### 写真メタデータ
 
@@ -140,9 +187,14 @@ curl -X POST http://100.75.72.93:5000/api/ingest \
   -H "Content-Type: application/json" \
   -d '{"source":"health","date":"2026-03-23","steps":8000,"active_calories":400,"heart_rate_avg":72,"heart_rate_max":130,"heart_rate_min":55,"exercise_minutes":30,"stand_hours":9}'
 
+# Jomo スクリーンタイム
+curl -X POST http://100.75.72.93:5000/api/ingest \
+  -H "Content-Type: application/json" \
+  -d '{"source":"screen_time","date":"2026-03-30","screen_time_seconds":18000}'
+
 # DB確認
 PGPASSWORD=password psql -U planet -h localhost -d planet \
-  -c "SELECT date, steps, heart_rate_avg, photo_count FROM health_daily ORDER BY date DESC LIMIT 5;"
+  -c "SELECT date, steps, heart_rate_avg, screen_time_seconds, photo_count FROM health_daily ORDER BY date DESC LIMIT 5;"
 ```
 
 ---

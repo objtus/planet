@@ -137,9 +137,29 @@ CREATE TABLE health_daily (
     heart_rate_min      INT,
     exercise_minutes    INT,
     stand_hours         INT,
+    screen_time_seconds INT,
     photo_count         INT DEFAULT 0,
     photo_locations     JSONB
 );
+
+-- 5-8b. streaming_views（Netflix / Prime Video 視聴履歴インポート）
+CREATE TABLE streaming_views (
+    id                   BIGSERIAL PRIMARY KEY,
+    log_id               BIGINT NOT NULL UNIQUE REFERENCES logs(id) ON DELETE CASCADE,
+    source_id            INT NOT NULL REFERENCES data_sources(id),
+    provider             TEXT NOT NULL CHECK (provider IN ('netflix', 'prime')),
+    title                TEXT NOT NULL,
+    episode_title        TEXT,
+    watched_on           DATE NOT NULL,
+    watched_at           TIMESTAMPTZ NOT NULL,
+    content_kind         TEXT,
+    external_series_id   TEXT,
+    external_episode_id  TEXT,
+    metadata             JSONB
+);
+
+CREATE INDEX idx_streaming_views_watched_at ON streaming_views (watched_at DESC);
+CREATE INDEX idx_streaming_views_provider ON streaming_views (provider);
 
 -- 5-9. rss_entries
 CREATE TABLE rss_entries (

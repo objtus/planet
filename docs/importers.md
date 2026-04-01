@@ -4,6 +4,88 @@
 
 ---
 
+## Netflix / Amazon Prime Video（CSV）
+
+CLI: `importers/streaming_csv.py`（`python -m importers.streaming_csv`）。
+
+**前提**: DB に `streaming_views` テーブルと `data_sources`（`type` = `netflix` / `prime`）を作成済みであること。
+
+```bash
+sudo -u postgres psql -d planet < db/migrate_streaming_views.sql
+```
+
+（ホーム配下のファイルを `postgres` が読めない場合は、リダイレクトで渡す。）
+
+### コマンド例
+
+```bash
+cd /home/objtus/planet
+source venv/bin/activate
+
+# パースのみ（DB 不接続）
+python -m importers.streaming_csv --dry-run ~/planet-data/exports/NetflixViewingHistory.csv
+python -m importers.streaming_csv --dry-run ~/planet-data/exports/watch-history-export-1774956500013.csv
+
+# 本番取り込み（ヘッダから netflix / prime を自動判定。明示する場合は --format）
+python -m importers.streaming_csv ~/planet-data/exports/NetflixViewingHistory.csv
+python -m importers.streaming_csv --netflix-profile ホ ~/planet-data/exports/NetflixViewingActivityFull.csv
+python -m importers.streaming_csv --format prime ~/planet-data/exports/watch-history-export-*.csv
+```
+
+- `--strict`: パースエラーで即終了（終了コード 1）。
+- `--netflix-profile NAME`: **netflix_activity のみ**。`Profile Name` が一致する行だけ取り込む（家族アカウントで自分のプロファイルだけ入れたいとき）。
+- 500 件ごとにコミット。
+
+### Netflix 公式 CSV
+
+#### 視聴履歴（従来の短いエクスポート）
+
+- ヘッダ: `Title`, `Date`
+- 日付: `M/D/YY`（時刻なし）。DB ではその**暦日の JST 正午**を `logs.timestamp` に保存。
+- `logs.original_id`: `SHA-256(タイトル + NUL + Date列そのまま)` の hex。
+
+#### 視聴アクティビティ（完全版・詳細 CSV）
+
+Netflix アカウントの「視聴アクティビティ」から取得する、列が多い形式（例: `Duration`, `Start Time`, `Profile Name`, …, `Title`）。ファイル名は `NetflixViewingActivityFull.csv` など。
+
+- 自動判定キー: `Title` + `Start Time` + `Duration`
+- `Start Time`: `YYYY-MM-DD HH:MM:SS`（タイムゾーン表記なし → **JST** として解釈し、その瞬間を `logs.timestamp` / `streaming_views.watched_at` に保存。従来の `Date` 列版より時刻が正確。
+- `logs.original_id`: `SHA-256(タイトル + NUL + Start Time列そのまま)` の hex（同一エピソードの再視聴は行が分かれる）。
+- メタデータ: `Duration`, `Profile Name`, `Device Type`, `Supplemental Video Type` 等を `logs.metadata` / `streaming_views.metadata` に格納。
+- **Title が空の行**は Netflix 側データの欠損としてスキップされることがある（完全版でも数行）。
+
+手動で `--format netflix_activity` を指定することもできる。
+
+#### 既存データとの整合性（`source_id` = Netflix）
+
+`logs` は `(source_id, original_id)` で upsert される。
+
+| 過去に取り込んだもの | 「ホ」だけ netflix_activity を取り込んだとき |
+|----------------------|---------------------------------------------|
+| **何もない** | 「ホ」の行だけ新規 INSERT。他プロファイルは DB に載らない。 |
+| **同じ netflix_activity を全プロファイル込みで取り済み** | 「ホ」の行は **同じ `original_id`** のため UPDATE（内容・メタデータが上書き）。**j / あ 等の行はそのまま残る**（CSV からは送らないだけで、自動削除はされない）。他プロファイル分を消したい場合は手動で `logs` / `streaming_views` から削除するか、条件付き DELETE が必要。 |
+| **古い `Title`+`Date`（日付のみ）形式のみ** | `original_id` の作り方が **別**（`Date` 文字列 vs `Start Time` 文字列）のため、**同じ視聴でも別行として二重登録**になり得る。片方に寄せるなら、古い形式の行を消してから詳細版だけ入れる、または詳細版のみ運用する。 |
+
+### Amazon Prime（ブラウザ等でエクスポートした CSV）
+
+- ヘッダ例: `Date Watched`, `Type`, `Title`, `Episode Title`, `Global Title Identifier`, `Episode Global Title Identifier`, `Path`, `Episode Path`, `Image URL`
+- `Date Watched`: `YYYY-MM-DD HH:MM:SS.mmm`（タイムゾーンなし → **JST** として解釈）。
+- `logs.original_id`: `Episode Global Title Identifier` が空でなければその文字列。空ならタイトル・エピソード・日時から SHA-256。
+
+### DB
+
+- `logs` と `streaming_views` を同一トランザクションで upsert（`ON CONFLICT` で再実行可）。
+
+**権限エラー**（`permission denied for table streaming_views`）: マイグレーションを `sudo -u postgres` で流すとテーブル所有者が `postgres` のままになることがある。次を一度実行する（DB ユーザー名が `planet` でない場合は置き換え）。
+
+```bash
+sudo -u postgres psql -d planet < db/fix_streaming_views_owner.sql
+```
+
+新規に `migrate_streaming_views.sql` から適用する場合は、ファイル末尾の `ALTER TABLE ... OWNER TO planet` が含まれる版を使う。
+
+---
+
 ## アカウント・インスタンス一覧
 
 | アカウント | 種別 | 状態 | インポート | 収集スクリプト |

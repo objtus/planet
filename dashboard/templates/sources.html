@@ -62,7 +62,7 @@
           </td>
           <!-- 収集ボタン -->
           <td style="text-align:center;padding:4px">
-            {% if item.type in ['misskey','mastodon','lastfm','weather','github','rss','youtube'] %}
+            {% if item.type in ['misskey','mastodon','lastfm','weather','github','rss','youtube','scrapbox'] %}
             <button class="collect-btn" data-type="{{ item.type }}"
                     onclick="collectSource('{{ item.type }}', this)" title="{{ item.type }} を今すぐ収集">▶</button>
             {% else %}

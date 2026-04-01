@@ -26,12 +26,11 @@
   {% if q %}
   <div class="result-meta" style="margin-top:12px">「{{ q }}」— {{ total }} 件</div>
   <div class="card" style="padding:0.5rem 1rem">
-    <div class="timeline">
+    <div class="timeline" id="search-results-timeline">
       {% for e in entries %}
-      <div class="tl-item">
-        <span class="tl-badge b-{{ {'misskey':'msk','mastodon':'mst','lastfm':'lfm','health':'hlth','photo':'hlth'}.get(e.source_type,'rss') }}">
-          {{ {'misskey':'🍣','mastodon':'🐘','lastfm':'🎵','health':'🍎','photo':'📷','rss':'🌐','weather':'☁️','github':'🐱','youtube':'▶️'}.get(e.source_type,'🌐') }}
-          {{ e.source_name }}
+      <div class="tl-item" data-log-id="{{ e.id }}" data-source-type="{{ e.source_type }}">
+        <span class="tl-badge b-{{ e.badge_cls }}">
+          {{ e.badge_emoji }} {{ e.source_name }}
         </span>
         <div class="tl-content">
           {% if e.metadata.get('cw') %}
@@ -39,8 +38,16 @@
           {% else %}
           <div class="tl-text">{{ e.content }}</div>
           {% endif %}
-          {% if e.url %}<a href="{{ e.url }}" target="_blank" rel="noopener" style="color:var(--color-text-info);font-size:10px"> ↗</a>{% endif %}
-          <div class="tl-time">{{ e.timestamp }}</div>
+          <div class="tl-meta-row">
+            <div class="tl-meta-row-left">
+              <a class="tl-time" href="{{ url_for('calendar') }}?view=day&date={{ e.date_jst }}">{{ e.timestamp }}</a>
+            </div>
+            {% if e.source_type == 'lastfm' %}
+            <div class="tl-meta-row-right">
+              <button type="button" class="tl-delete-lastfm" data-log-id="{{ e.id }}" title="一覧から非表示（ソフト削除）">削除</button>
+            </div>
+            {% endif %}
+          </div>
         </div>
       </div>
       {% else %}
@@ -50,4 +57,42 @@
   </div>
   {% endif %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  var root = document.getElementById('search-results-timeline');
+  if (!root) return;
+  root.addEventListener('click', function (ev) {
+    var btn = ev.target.closest('button.tl-delete-lastfm');
+    if (!btn) return;
+    ev.preventDefault();
+    var logId = btn.dataset.logId;
+    if (!logId) return;
+    if (!confirm('検索結果・カレンダーなどから、この再生履歴を非表示にしてよいですか？（ソフト削除）')) return;
+    btn.disabled = true;
+    fetch('/api/logs/' + encodeURIComponent(logId) + '/soft-delete', { method: 'POST' })
+      .then(function (res) {
+        return res.json().then(function (data) {
+          return { res: res, data: data };
+        }).catch(function () {
+          return { res: res, data: {} };
+        });
+      })
+      .then(function (o) {
+        if (!o.res.ok) {
+          alert(o.data.error || ('HTTP ' + o.res.status));
+          btn.disabled = false;
+          return;
+        }
+        location.reload();
+      })
+      .catch(function (e) {
+        alert(String(e));
+        btn.disabled = false;
+      });
+  });
+})();
+</script>
 {% endblock %}

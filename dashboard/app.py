@@ -39,12 +39,16 @@ TYPE_INFO = {
     "misskey":  {"cls": "msk",  "emoji": "🍣", "favicon": None},  # base_url から生成
     "mastodon": {"cls": "mst",  "emoji": "🐘", "favicon": None},  # base_url から生成
     "lastfm":   {"cls": "lfm",  "emoji": "🎵", "favicon": "https://www.last.fm/favicon.ico"},
-    "health":   {"cls": "hlth", "emoji": "🍎", "favicon": None},
-    "photo":    {"cls": "hlth", "emoji": "📷", "favicon": None},
+    "health":      {"cls": "hlth", "emoji": "🍎", "favicon": None},
+    "photo":       {"cls": "hlth", "emoji": "📷", "favicon": None},
+    "screen_time": {"cls": "hlth", "emoji": "📱", "favicon": None},
     "rss":      {"cls": "rss",  "emoji": "🌐", "favicon": None},  # base_url から生成
     "weather":  {"cls": "rss",  "emoji": "☁️", "favicon": None},
     "github":   {"cls": "rss",  "emoji": "🐱", "favicon": "https://github.com/favicon.ico"},
     "youtube":  {"cls": "rss",  "emoji": "▶️", "favicon": "https://www.youtube.com/favicon.ico"},
+    "scrapbox": {"cls": "rss",  "emoji": "📓", "favicon": "https://scrapbox.io/favicon.ico"},
+    "netflix":  {"cls": "rss",  "emoji": "🎬", "favicon": "https://www.netflix.com/favicon.ico"},
+    "prime":    {"cls": "rss",  "emoji": "📺", "favicon": None},
 }
 
 
@@ -65,7 +69,9 @@ def _auto_short_name(stype, base_url, name):
     """種別・URL から短縮名を自動生成する"""
     domain = (base_url or "").replace("https://", "").replace("http://", "").rstrip("/")
     fixed  = {"lastfm": "last.fm", "health": "health", "photo": "photo",
-              "weather": "weather", "github": "github", "youtube": "youtube"}
+              "screen_time": "jomo", "weather": "weather", "github": "github",
+              "youtube": "youtube", "scrapbox": "scrapbox",
+              "netflix": "netflix", "prime": "prime"}
     return fixed.get(stype) or SHORT_NAME_MAP.get(domain) or domain or name
 
 
@@ -330,6 +336,41 @@ def create_app():
         finally:
             cur.close(); conn.close()
 
+    @app.route("/api/logs/<int:log_id>/soft-delete", methods=["POST"])
+    def api_log_soft_delete(log_id):
+        """Last.fm の1件のみソフト削除（is_deleted）。データソース自体は変更しない。"""
+        conn = get_db_conn()
+        cur = conn.cursor()
+        try:
+            cur.execute(
+                """
+                SELECT l.is_deleted, ds.type
+                  FROM logs l
+                  JOIN data_sources ds ON ds.id = l.source_id
+                 WHERE l.id = %s
+                """,
+                (log_id,),
+            )
+            row = cur.fetchone()
+            if not row:
+                return jsonify({"error": "ログが見つかりません"}), 404
+            if row[1] != "lastfm":
+                return jsonify({"error": "Last.fm 以外のログは削除できません"}), 400
+            if row[0]:
+                return jsonify({"error": "すでに非表示です"}), 400
+            cur.execute(
+                "UPDATE logs SET is_deleted = TRUE WHERE id = %s",
+                (log_id,),
+            )
+            conn.commit()
+            return jsonify({"ok": True})
+        except Exception as e:
+            conn.rollback()
+            return jsonify({"error": str(e)}), 500
+        finally:
+            cur.close()
+            conn.close()
+
     # ------------------------------------------------------------------ #
     # API: 統計（JSON）
     # ------------------------------------------------------------------ #
@@ -538,15 +579,23 @@ def create_app():
                      LIMIT 200
                 """, params)
                 rows = cur.fetchall()
-                entries = [
-                    {
-                        "id": r[0], "content": r[1], "url": r[2],
-                        "timestamp": r[3].strftime("%Y-%m-%d %H:%M"),
-                        "metadata":  r[4] or {},
-                        "source_name": r[5], "source_type": r[6],
-                    }
-                    for r in rows
-                ]
+                entries = []
+                for r in rows:
+                    bi = TYPE_INFO.get(r[6], {"cls": "rss", "emoji": "🌐"})
+                    entries.append(
+                        {
+                            "id": r[0],
+                            "content": r[1],
+                            "url": r[2],
+                            "timestamp": r[3].strftime("%Y-%m-%d %H:%M"),
+                            "date_jst": r[3].strftime("%Y-%m-%d"),
+                            "metadata": r[4] or {},
+                            "source_name": r[5],
+                            "source_type": r[6],
+                            "badge_cls": bi["cls"],
+                            "badge_emoji": bi["emoji"],
+                        }
+                    )
                 total = len(entries)
         finally:
             cur.close(); conn.close()
@@ -1124,6 +1173,7 @@ def create_app():
         "github":   ROOT / "collectors" / "github.py",
         "rss":      ROOT / "collectors" / "rss.py",
         "youtube":  ROOT / "collectors" / "youtube.py",
+        "scrapbox": ROOT / "collectors" / "scrapbox.py",
         "all":      ROOT / "collect_all.py",
     }
     PYTHON = ROOT / "venv" / "bin" / "python"

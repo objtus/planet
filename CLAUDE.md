@@ -200,6 +200,8 @@ Each collector lives in `collectors/<source>.py` and follows a consistent patter
 - API endpoints return JSON; UI routes return rendered templates
 - JST conversion applied at display time, not storage time
 - Frontend uses `fetch()` + Chart.js — no build step required
+- **Calendar timeline**: timestamp links to the entry’s source URL when `logs.url` is set; no separate ↗ control
+- **Search (`/search`)**: hit timestamps link to `/?view=day&date=YYYY-MM-DD` (JST day); Last.fm rows expose the same soft-delete button + `POST /api/logs/<id>/soft-delete` as the calendar (see `docs/dashboard_ui.md`)
 
 ### Summarizer prompts (`summarizer/prompts/`)
 
@@ -222,6 +224,7 @@ Each collector lives in `collectors/<source>.py` and follows a consistent patter
 | Method | Path | Description |
 |---|---|---|
 | GET | `/` | Calendar view (main UI) |
+| GET | `/search` | Keyword search (`q`) + optional `source_id`, `date_from`, `date_to` |
 | GET | `/api/heatmap` | Heatmap data (`?year=Y&month=M&metric=posts/plays/steps/weather`) |
 | GET | `/api/timeline` | Timeline entries (`?date=YYYY-MM-DD&period=day/week/month/year&sources=…`) |
 | GET | `/api/stats` | Statistics aggregates (`?period=month/year`) |
@@ -229,6 +232,7 @@ Each collector lives in `collectors/<source>.py` and follows a consistent patter
 | GET | `/api/summary` | Single summary (`?period=week/month&date=YYYY-Www/YYYY-MM`) |
 | GET | `/api/sources` | List all data sources |
 | POST | `/api/collect/<stype>` | Manually trigger collection for a source type |
+| POST | `/api/logs/<id>/soft-delete` | Soft-delete one Last.fm log (`is_deleted`; Last.fm only). Used from calendar and search timelines |
 | PATCH | `/api/summaries/<id>/publish` | Toggle publication status |
 | POST | `/ingest/health` | Receive iPhone health data |
 | POST | `/ingest/photos` | Receive iPhone photo metadata |
@@ -257,6 +261,7 @@ Always check `docs/` before making architectural decisions:
 | `docs/overview.md` | Project goals and tech stack summary |
 | `docs/current_state.md` | Phase/milestone status checklist |
 | `docs/design.md` | Full architecture & DB schema rationale (19KB) |
+| `docs/dashboard_ui.md` | Calendar / search / timeline UI behavior (links, Last.fm delete) |
 | `docs/setup.md` | Installation walkthrough |
 | `docs/decisions.md` | Design rationale (why PostgreSQL, Ollama, etc.) |
 | `docs/phase6_plan.md` | Remaining milestones (M3–M6) |

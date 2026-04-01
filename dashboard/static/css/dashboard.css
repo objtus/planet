@@ -923,6 +923,46 @@ select {
 a.tl-time   { text-decoration: underline dotted; display: block; }
 a.tl-time:hover { text-decoration: underline; }
 
+.tl-meta-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+  justify-content: space-between;
+  width: 100%;
+}
+.tl-meta-row-left {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+.tl-meta-row-right {
+  flex-shrink: 0;
+}
+.tl-meta-row .tl-time { display: inline; margin-top: 0; }
+.tl-meta-row a.tl-time { display: inline; }
+
+.tl-delete-lastfm {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: var(--border-radius-sm);
+  border: 0.5px solid var(--color-border-tertiary);
+  background: var(--color-background-primary);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+.tl-delete-lastfm:hover {
+  color: var(--color-text-primary);
+  border-color: var(--color-border-secondary);
+}
+.tl-delete-lastfm:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 /* メディア添付 */
 .tl-media {
   display: flex;

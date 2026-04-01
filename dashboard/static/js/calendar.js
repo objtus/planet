@@ -1310,14 +1310,22 @@ function renderTimeline(entries, mode) {
           ? `<span class="tl-media-hint" title="添付あり（投稿を開くと確認できます）">📎</span>`
           : '');
 
+    const lastfmDelete = source?.type === 'lastfm'
+      ? `<button type="button" class="tl-delete-lastfm" data-log-id="${e.id}" title="一覧から非表示（ソフト削除）">削除</button>`
+      : '';
+    const timeEl = e.url
+      ? `<a class="tl-time" href="${esc(e.url)}" target="_blank" rel="noopener">${timeLabel}</a>`
+      : `<span class="tl-time">${timeLabel}</span>`;
+    const metaLeft = `<div class="tl-meta-row-left">${timeEl}</div>`;
+    const metaRight = lastfmDelete ? `<div class="tl-meta-row-right">${lastfmDelete}</div>` : '';
+    const metaRow = `<div class="tl-meta-row">${metaLeft}${metaRight}</div>`;
+
     return `<div class="tl-item" data-src="${e.source_id}"${mediaMark}>
       ${badge}
       <div class="tl-content">
         ${mainHTML}
         ${mediaSection}
-        ${e.url
-          ? `<a class="tl-time" href="${esc(e.url)}" target="_blank" rel="noopener">${timeLabel}</a>`
-          : `<div class="tl-time">${timeLabel}</div>`}
+        ${metaRow}
       </div>
     </div>`;
   }).join('');
@@ -1490,6 +1498,53 @@ function buildFilterBar() {
 // =========================================================
 
 buildFilterBar();
+
+/** 現在の日/週/月ビューでタイムラインだけ再読込 */
+function refreshCurrentTimeline() {
+  if (cur.viewMode === 'day' && cur.selDay != null) {
+    return loadDay();
+  }
+  if (cur.viewMode === 'week' && cur.selWeek) {
+    return loadWeek(cur.selWeek.year, cur.selWeek.week);
+  }
+  if (cur.viewMode === 'month') {
+    return loadMonth();
+  }
+  return Promise.resolve();
+}
+
+document.getElementById('timeline')?.addEventListener('click', (ev) => {
+  const btn = ev.target.closest('button.tl-delete-lastfm');
+  if (!btn) return;
+  ev.preventDefault();
+  ev.stopPropagation();
+  const logId = btn.dataset.logId;
+  if (!logId) return;
+  if (!confirm('この再生履歴を一覧から非表示にしますか？（ソフト削除）')) return;
+  void (async () => {
+    btn.disabled = true;
+    try {
+      const res = await fetch(`/api/logs/${encodeURIComponent(logId)}/soft-delete`, {
+        method: 'POST',
+      });
+      let data = {};
+      try {
+        data = await res.json();
+      } catch (_) { /* empty */ }
+      if (!res.ok) {
+        alert(data.error || `HTTP ${res.status}`);
+        btn.disabled = false;
+        return;
+      }
+      await refreshCurrentTimeline();
+      heatLoadKey = '';
+      void refreshCalWithHeat();
+    } catch (e) {
+      alert(String(e));
+      btn.disabled = false;
+    }
+  })();
+});
 
 document.getElementById('summary-generate-btn')?.addEventListener('click', () => {
   void onSummaryGenerateClick();

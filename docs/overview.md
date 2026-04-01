@@ -54,6 +54,7 @@ OllamaでAIサマリーを生成、Neocitiesの個人サイトに自動公開す
 
 - URL: `http://<tailscale-ip>:5000`（`planet-dashboard.service` で起動）
 - 画面: カレンダー / 検索 / サマリー / 統計 / ソース管理
+- **検索**: ヒット行の日時からカレンダー日ビューへジャンプ。Last.fm は検索結果からもソフト削除可（カレンダーと同じ API）
 - 月カレンダー形式のヒートマップ（投稿数を青の濃淡で表現）。前後月の日付も薄く表示
 - 日・週・月・年の切り替えによるタイムライン表示。見出し日付は表示中タイムラインと一致（カレンダー月送りのみでは変わらない）
 - カレンダー右上から現在表示月・年のタイムラインへジャンプ可能
@@ -90,6 +91,6 @@ planet/
 
 ## 現在の状態・次のタスク
 
-→ `docs/current_state.md` を参照
+→ `docs/current_state.md` を参照（Netflix / Prime 視聴履歴 CSV インポートは `docs/importers.md` に手順あり）
 
 Phase 6（AI 生成・Neocities）の実装手順 → **`docs/phase6_plan.md`**

@@ -75,7 +75,9 @@
 
 ### タイムライン
 - 画像サムネイル: クリックでライトボックス拡大（閉じる・前後画像ナビ）
-- ソースバッジ + 投稿内容 + 時刻 の3カラム構成
+- ソースバッジ + 投稿内容 + **メタ行**（時刻・Last.fm 時は右端に削除）の構成（`.tl-meta-row` / `.tl-meta-row-left` / `.tl-meta-row-right`）
+- **時刻リンク（カレンダー上のタイムライン）**: `logs.url` があるエントリは、時刻テキストが**ソース先（外部）**への `<a>`。URL がない行は `<span>` のみ（再リンクなし）。外部用の ↗ などは付けない。
+- **Last.fm 行の「削除」**: 行右のボタン。確認後 `POST /api/logs/<id>/soft-delete` で `logs.is_deleted` を立てる（Last.fm のみ API が受理）。成功後は当該タイムラインを再取得し、ヒートマップも更新（`calendar.js`）。
 - バッジ: favicon（16x16px の `<img>`）+ コンパクトなサーバー名
   - 実装時: `https://<instance>/favicon.ico` を `<img>` で表示
   - フォールバック: ソース種別の絵文字（🍣 Misskey / 🐘 Mastodon / 🎵 Last.fm / 🍎 ヘルス / 🌐 RSS）
@@ -96,6 +98,16 @@
 | last.fm | last.fm |
 | health（iPhone）| health |
 | 個人サイトRSS | 100%health |
+
+---
+
+## 検索画面（`/search`）
+
+- **入力**: キーワード（`logs.content` の `LIKE '%…%'`）＋ソース（`source_id`）＋日付範囲（`date_from` / `date_to`）。`is_deleted = FALSE` のみ。最大 **200 件**（`dashboard/app.py` の `search()`）。
+- **表示**: カレンダー日ビューに近いタイムライン風リスト（`templates/search.html`）。バッジの種別・絵文字は **`TYPE_INFO`**（`app.py`）とカレンダー側と揃える。
+- **日時リンク**: クリックで **カレンダーの日ビュー**へ遷移（`/?view=day&date=YYYY-MM-DD`。日付は JST 表示に対応する `date_jst`）。検索では「いつか」をカレンダー上で位置づけやすくするため、カレンダー本体のタイムラインとは役割を分ける（カレンダー側の時刻はソース先リンク）。
+- **Last.fm**: 行右に **「削除」**。確認ダイアログ（検索文脈向け文言）のあと、同じ **`POST /api/logs/<id>/soft-delete`** を `fetch` で呼び出し、成功時は **`location.reload()`** で結果を更新。
+- 検索結果からソース URL への直接リンクや ↗ は**置かない**。
 
 ---
 

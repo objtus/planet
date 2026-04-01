@@ -11,8 +11,35 @@ from flask import Flask, Blueprint, request, jsonify
 
 CONFIG_PATH = Path(__file__).parent.parent / "config" / "settings.toml"
 
+JST = timezone(timedelta(hours=9))
+
 HEALTH_SOURCE_ID = 9
 PHOTO_SOURCE_ID = 10
+
+
+def _normalize_calendar_date_jst(raw) -> str:
+    """YYYY-MM-DD または ISO 8601 日時を JST の暦日にそろえる（ingest の date 用）。"""
+    s = str(raw).strip()
+    if len(s) == 10 and s[4:5] == "-" and s[7:8] == "-":
+        return s
+    try:
+        ts = s.replace("Z", "+00:00")
+        dt = datetime.fromisoformat(ts)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(JST).strftime("%Y-%m-%d")
+    except (ValueError, TypeError):
+        raise ValueError(
+            "date は YYYY-MM-DD または ISO 8601 日時である必要があります"
+        ) from None
+
+
+def _source_id_by_type(cur, stype: str) -> int:
+    cur.execute("SELECT id FROM data_sources WHERE type = %s LIMIT 1", (stype,))
+    row = cur.fetchone()
+    if not row:
+        raise ValueError(f"data_sources に type={stype!r} がありません（マイグレーション未実行の可能性）")
+    return row[0]
 
 
 def load_config():
@@ -228,6 +255,59 @@ def _upsert_photos(cur, data: dict) -> dict:
     return {"dates": sorted(by_date.keys()), "saved": total_saved}
 
 
+def _format_screen_time_seconds(sec: int) -> str:
+    h, r = divmod(int(sec), 3600)
+    m, s = divmod(r, 60)
+    if h > 0:
+        return f"スクリーンタイム: {h}時間{m}分"
+    if m > 0:
+        return f"スクリーンタイム: {m}分{s}秒"
+    return f"スクリーンタイム: {s}秒"
+
+
+def _upsert_screen_time(cur, data: dict) -> dict:
+    """Jomo 由来の1日スクリーンタイム（秒）を logs と health_daily に保存"""
+    date_str = _normalize_calendar_date_jst(data["date"])
+    raw = data.get("screen_time_seconds")
+    if raw is None:
+        raise ValueError("screen_time_seconds が必要です")
+    try:
+        sec = int(raw)
+    except (TypeError, ValueError) as e:
+        raise ValueError("screen_time_seconds は整数である必要があります") from e
+    if sec < 0 or sec > 86400 * 2:
+        raise ValueError("screen_time_seconds が範囲外です（0〜172800 秒まで）")
+
+    source_id = _source_id_by_type(cur, "screen_time")
+    content = _format_screen_time_seconds(sec)
+    ts = datetime.now(timezone.utc)
+    meta = json.dumps(
+        {"type": "screen_time", "date": date_str, "screen_time_seconds": sec}
+    )
+
+    cur.execute(
+        """INSERT INTO logs (source_id, original_id, content, url, timestamp, metadata)
+           VALUES (%s, %s, %s, NULL, %s, %s)
+           ON CONFLICT (source_id, original_id) DO UPDATE
+             SET content   = EXCLUDED.content,
+                 metadata  = EXCLUDED.metadata,
+                 timestamp = EXCLUDED.timestamp
+           RETURNING id""",
+        (source_id, date_str, content, ts, meta),
+    )
+    log_id = cur.fetchone()[0]
+
+    cur.execute(
+        """INSERT INTO health_daily (date, screen_time_seconds)
+           VALUES (%s, %s)
+           ON CONFLICT (date) DO UPDATE SET
+               screen_time_seconds = EXCLUDED.screen_time_seconds""",
+        (date_str, sec),
+    )
+
+    return {"date": date_str, "log_id": log_id, "screen_time_seconds": sec}
+
+
 # ---- Blueprint ----
 
 ingest_bp = Blueprint("ingest", __name__)
@@ -244,8 +324,10 @@ def ingest():
         data["date"] = data.pop("dates")
 
     source = data.get("source")
-    if source not in ("health", "photo"):
-        return jsonify({"error": "source must be 'health' or 'photo'"}), 400
+    if source not in ("health", "photo", "screen_time"):
+        return jsonify(
+            {"error": "source must be 'health', 'photo', or 'screen_time'"}
+        ), 400
 
     config = load_config()
     conn = get_db_conn(config)
@@ -255,6 +337,18 @@ def ingest():
             if "date" not in data:
                 return jsonify({"error": "date is required for health source", "received_keys": list(data.keys()), "received_data": data}), 400
             result = _upsert_health(cur, data)
+        elif source == "screen_time":
+            if "date" not in data:
+                return jsonify(
+                    {
+                        "error": "date is required for screen_time source",
+                        "received_keys": list(data.keys()),
+                    }
+                ), 400
+            try:
+                result = _upsert_screen_time(cur, data)
+            except ValueError as e:
+                return jsonify({"error": str(e)}), 400
         else:
             result = _upsert_photos(cur, data)
 

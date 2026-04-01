@@ -18,6 +18,7 @@ COLLECTORS = {
     "github":   ("collectors.github",    "GithubCollector"),
     "rss":      ("collectors.rss",       "RssCollector"),
     "youtube":  ("collectors.youtube",   "YoutubeCollector"),
+    "scrapbox": ("collectors.scrapbox",  "ScrapboxCollector"),
 }
 
 # グループエイリアス
