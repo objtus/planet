@@ -11,6 +11,22 @@
     </button>
   </div>
 
+  <div class="card streaming-import-card">
+    <div class="streaming-import-title">Netflix / Prime 視聴 CSV</div>
+    <p class="streaming-import-hint">
+      Netflix 簡易・詳細、Amazon Prime の公式エクスポートに対応。詳細版はファイル全体を正本として取り込みます。
+      簡易版は DB 上の Netflix 最新日（JST）より<strong>後</strong>の暦日のみです（<code>settings.toml</code> の <code>[streaming_import]</code> と連携）。
+    </p>
+    <div class="streaming-import-profile">
+      <label for="streaming-netflix-profile">Netflix 詳細のプロファイル名（詳細 CSV のときのみ使用）</label>
+      <input type="text" id="streaming-netflix-profile" class="streaming-profile-input" placeholder="ホ" maxlength="32" autocomplete="off">
+    </div>
+    <div id="streaming-dropzone" class="streaming-dropzone" tabindex="0">
+      <span class="streaming-dropzone-label">CSV をドラッグ＆ドロップ、またはクリックして選択</span>
+      <input type="file" id="streaming-file-input" accept=".csv,text/csv" style="display:none">
+    </div>
+  </div>
+
   <div class="card" style="padding:0">
     <table class="sources-table">
       <thead>
@@ -187,7 +203,57 @@ function showLog(title, body) {
   logEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
+// ---- Netflix / Prime CSV 取り込み ---------------------------------------
+function _bindStreamingDropzone() {
+  const zone = document.getElementById('streaming-dropzone');
+  const input = document.getElementById('streaming-file-input');
+  if (!zone || !input) return;
+
+  zone.addEventListener('click', () => input.click());
+  zone.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); input.click(); }
+  });
+  ['dragenter', 'dragover'].forEach((ev) => {
+    zone.addEventListener(ev, (e) => { e.preventDefault(); e.stopPropagation(); zone.classList.add('dragover'); });
+  });
+  ['dragleave', 'drop'].forEach((ev) => {
+    zone.addEventListener(ev, (e) => { e.preventDefault(); e.stopPropagation(); zone.classList.remove('dragover'); });
+  });
+  zone.addEventListener('drop', (e) => {
+    const f = e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) uploadStreamingCsv(f);
+  });
+  input.addEventListener('change', () => {
+    const f = input.files && input.files[0];
+    if (f) uploadStreamingCsv(f);
+    input.value = '';
+  });
+}
+
+async function uploadStreamingCsv(file) {
+  const fd = new FormData();
+  fd.append('file', file);
+  const prof = document.getElementById('streaming-netflix-profile');
+  if (prof && prof.value.trim()) fd.append('netflix_profile', prof.value.trim());
+  showLog('CSV を取り込み中…', '');
+  try {
+    const res = await fetch('/api/import/streaming-csv', { method: 'POST', body: fd });
+    let data = {};
+    try { data = await res.json(); } catch (_) {}
+    const lines = (data.messages || []).join('\n');
+    const body = lines || (data.error ? String(data.error) : JSON.stringify(data, null, 2));
+    if (!res.ok || data.success === false) {
+      showLog('CSV 取り込み — 失敗', data.error || body);
+    } else {
+      showLog('CSV 取り込み — 完了', body);
+    }
+  } catch (e) {
+    showLog('CSV 取り込み — 通信エラー', String(e));
+  }
+}
+
 // 初期化
 updateMoveButtons();
+_bindStreamingDropzone();
 </script>
 {% endblock %}

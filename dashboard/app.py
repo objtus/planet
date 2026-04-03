@@ -1,10 +1,12 @@
 """Planet ダッシュボード Flask アプリ (Phase 5)"""
 
+import csv
 import json
 import os
 import queue
 import subprocess
 import sys
+import tempfile
 import threading
 from calendar import monthrange
 import tomllib
@@ -13,10 +15,12 @@ from pathlib import Path
 from datetime import datetime, timezone, timedelta, date
 
 from flask import Flask, Response, jsonify, render_template, request, stream_with_context
+from werkzeug.exceptions import RequestEntityTooLarge
 
 ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT))
 from ingest.api import ingest_bp  # noqa: E402
+from importers.streaming_csv import detect_format, import_streaming_csv  # noqa: E402
 
 CONFIG_PATH = ROOT / "config" / "settings.toml"
 JST = timezone(timedelta(hours=9))
@@ -117,8 +121,16 @@ def create_app():
     app = Flask(__name__)
     config = load_config()
     app.secret_key = config["flask"]["secret_key"]
+    # Netflix / Prime 詳細 CSV 等（既定 40MB）
+    app.config["MAX_CONTENT_LENGTH"] = int(
+        os.environ.get("PLANET_MAX_UPLOAD_MB", "40")
+    ) * 1024 * 1024
 
     app.register_blueprint(ingest_bp)
+
+    @app.errorhandler(RequestEntityTooLarge)
+    def _upload_too_large(_e):
+        return jsonify({"error": "ファイルが大きすぎます（上限は PLANET_MAX_UPLOAD_MB または 40MB）"}), 413
 
     # ------------------------------------------------------------------ #
     # カレンダー（メイン画面）
@@ -1202,6 +1214,53 @@ def create_app():
             return jsonify({"error": "タイムアウト（120秒）"}), 504
         except Exception as e:
             return jsonify({"error": str(e)}), 500
+
+    # ------------------------------------------------------------------ #
+    # API: Netflix / Prime 視聴 CSV 取り込み（ソース管理から DnD）
+    # ------------------------------------------------------------------ #
+    @app.route("/api/import/streaming-csv", methods=["POST"])
+    def api_import_streaming_csv():
+        f = request.files.get("file")
+        if not f or not f.filename:
+            return jsonify({"error": "file が必要です"}), 400
+        cfg = load_config()
+        si = cfg.get("streaming_import") or {}
+        default_profile = (si.get("netflix_profile") or "ホ").strip()
+        profile_raw = (request.form.get("netflix_profile") or "").strip()
+
+        suffix = Path(f.filename).suffix or ".csv"
+        try:
+            fd, tmp_path = tempfile.mkstemp(prefix="planet-streaming-", suffix=suffix)
+            os.close(fd)
+            f.save(tmp_path)
+            path = Path(tmp_path)
+            try:
+                with open(path, encoding="utf-8-sig", newline="") as cf:
+                    hdr_fmt = detect_format(csv.DictReader(cf).fieldnames)
+                prof_kw = None
+                if hdr_fmt == "netflix_activity":
+                    prof_kw = profile_raw or default_profile
+                res = import_streaming_csv(
+                    path,
+                    fmt=None,
+                    dry_run=False,
+                    strict=False,
+                    netflix_profile=prof_kw,
+                )
+            finally:
+                path.unlink(missing_ok=True)
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+        body = {
+            "ok": res.ok,
+            "skip": res.skip,
+            "err": res.err,
+            "format": res.format,
+            "success": res.success,
+            "messages": res.messages,
+        }
+        return jsonify(body), (200 if res.success else 500)
 
     return app
 

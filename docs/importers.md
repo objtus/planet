@@ -36,6 +36,24 @@ python -m importers.streaming_csv --format prime ~/planet-data/exports/watch-his
 - `--netflix-profile NAME`: **netflix_activity のみ**。`Profile Name` が一致する行だけ取り込む（家族アカウントで自分のプロファイルだけ入れたいとき）。
 - 500 件ごとにコミット。
 
+### ダッシュボード（ソース管理）からの取り込み
+
+**パス**: `/sources` 上部の **Netflix / Prime 視聴 CSV** 欄。CSV をドラッグ＆ドロップまたはクリックで選択。
+
+- **API**: `POST /api/import/streaming-csv`（`multipart/form-data`：`file` = CSV、任意で `netflix_profile`）。
+- **Netflix 詳細**のときだけ、未指定なら `config/settings.toml` の **`[streaming_import] netflix_profile`**（例: `"ホ"`）を使う（テンプレートは `config/settings.toml.example`）。
+- **アップロード上限**: 既定 **40MB**（環境変数 `PLANET_MAX_UPLOAD_MB` で変更可）。大きい詳細 CSV に対応。
+
+### Netflix 簡易版のカットオフ（CLI・ダッシュボード共通）
+
+DB に **既に Netflix の行がある**場合、簡易版（`Title` + `Date`）では次のルールになる。
+
+- `MAX(logs.timestamp)` を **JST の暦日**にした日を **カットオフ日**とする（`is_deleted = FALSE`、`data_sources.type = 'netflix'`）。
+- CSV の各行について、`Date` が指す **JST 暦日**がカットオフ日 **より後**の行だけ取り込む（**同日は含めない**）。それより前の行はスキップ。
+- Netflix の行が **1 件もない**ときはカットオフなし（簡易は全行対象）。
+
+詳細版（`netflix_activity`）と Prime にはカットオフはかけない。
+
 ### Netflix 公式 CSV
 
 #### 視聴履歴（従来の短いエクスポート）
@@ -65,6 +83,20 @@ Netflix アカウントの「視聴アクティビティ」から取得する、
 | **何もない** | 「ホ」の行だけ新規 INSERT。他プロファイルは DB に載らない。 |
 | **同じ netflix_activity を全プロファイル込みで取り済み** | 「ホ」の行は **同じ `original_id`** のため UPDATE（内容・メタデータが上書き）。**j / あ 等の行はそのまま残る**（CSV からは送らないだけで、自動削除はされない）。他プロファイル分を消したい場合は手動で `logs` / `streaming_views` から削除するか、条件付き DELETE が必要。 |
 | **古い `Title`+`Date`（日付のみ）形式のみ** | `original_id` の作り方が **別**（`Date` 文字列 vs `Start Time` 文字列）のため、**同じ視聴でも別行として二重登録**になり得る。片方に寄せるなら、古い形式の行を消してから詳細版だけ入れる、または詳細版のみ運用する。 |
+
+#### 初回移行: 簡易版のみ入っている状態から詳細版へ（正本に切り替え）
+
+1. **`pg_dump` 等で DB をバックアップ**する。
+2. Netflix ソースに紐づく `logs` を削除する（`streaming_views` は `logs` への外部キーで **ON DELETE CASCADE** なので、ログを消せば視聴行も消える）。
+
+```sql
+BEGIN;
+DELETE FROM logs
+ WHERE source_id = (SELECT id FROM data_sources WHERE type = 'netflix' LIMIT 1);
+COMMIT;
+```
+
+3. **詳細 CSV**（例: `NetflixViewingActivityFull.csv`）を、ダッシュボードの DnD または CLI（`--netflix-profile ホ`）で取り込む。
 
 ### Amazon Prime（ブラウザ等でエクスポートした CSV）
 

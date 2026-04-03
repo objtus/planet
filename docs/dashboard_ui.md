@@ -114,6 +114,7 @@
 ## ソース管理画面（`/sources`）
 
 - 有効/無効トグル（従来どおり）
+- **Netflix / Prime 視聴 CSV**: ページ上部の枠に **CSV をドラッグ＆ドロップ**（またはクリックでファイル選択）。Netflix **詳細**のとき用に **プロファイル名**（例: `ホ`）を入力できる。`POST /api/import/streaming-csv`。取り込み結果（件数・メッセージ）は下の **収集ログ**パネルに表示。
 - 表示順: 行ごとの ▲/▼ → `POST /sources/<id>/move`
 - 略称: インライン入力 → 確定で `POST /sources/<id>/rename`（DB の `short_name`。未設定時は自動短縮名）
 - 収集: 行ごとの実行ボタン（種別にスクリプトがあるもの）と「全ソース今すぐ収集」。`POST /api/collect/<stype>`（`stype` は `weather` 等または `all`）。ログは画面のパネルに表示

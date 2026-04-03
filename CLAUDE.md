@@ -232,6 +232,7 @@ Each collector lives in `collectors/<source>.py` and follows a consistent patter
 | GET | `/api/summary` | Single summary (`?period=week/month&date=YYYY-Www/YYYY-MM`) |
 | GET | `/api/sources` | List all data sources |
 | POST | `/api/collect/<stype>` | Manually trigger collection for a source type |
+| POST | `/api/import/streaming-csv` | Netflix / Prime viewing history CSV (`multipart`: `file`, optional `netflix_profile`). Sources page drag-and-drop |
 | POST | `/api/logs/<id>/soft-delete` | Soft-delete one Last.fm log (`is_deleted`; Last.fm only). Used from calendar and search timelines |
 | PATCH | `/api/summaries/<id>/publish` | Toggle publication status |
 | POST | `/ingest/health` | Receive iPhone health data |
