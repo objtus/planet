@@ -1,0 +1,1555 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>planet - 100%health</title>
+  <meta name="description" content="100%health の planet ページ（モックアップ）。直近30日のカレンダーとタイムライン。">
+  <meta name="author" content="yuinoid">
+  <meta property="og:url" content="https://yuinoid.neocities.org/planet/planet-mockup.html">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="100%health">
+  <meta property="og:description" content="100%health の planet ページ（モックアップ）。直近30日のカレンダーとタイムライン。">
+  <meta property="og:locale" content="ja_JP">
+  <meta property="og:title" content="planet - 100%health">
+  <meta property="og:image" content="/img/ogp.gif">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="google-site-verification" content="H_-LY4RFx7v9bkgjTQpjGWcfEjtOkGaq0ie_m_vNe4g">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="apple-touch-icon" type="image/png" href="/apple-touch-icon-180x180.png">
+  <link rel="alternate" type="application/rss+xml" title="100%health RSS Feed" href="/rss.xml">
+  <link rel="stylesheet" href="../1column.css">
+  <script src="../js/jquery-3.6.0.min.js" defer></script>
+  <script src="../js/main.js" defer></script>
+  <script src="/js/mouse.js" defer></script>
+  <style>
+/*
+  box-sizing は #galleryspace 内のみに限定する（全要素に適用すると
+  #back / #address の幅計算が変わり、1column のヘッダー見え方とずれる）
+*/
+#galleryspace,
+#galleryspace *,
+#galleryspace *::before,
+#galleryspace *::after {
+  box-sizing: border-box;
+}
+
+#main h1.title {
+  padding-top: 0;
+  scale: 1 1;
+  margin-bottom: 2rem;
+}
+
+/* ---- section label ---- */
+.section-label {
+  font-size: 0.75em;
+  margin-bottom: 6px;
+  opacity: 0.45;
+  letter-spacing: 0.02em;
+}
+
+/* ========== カレンダー（旧7日サマリー枠） ========== */
+.summary-wrap {
+  margin-bottom: 2rem;
+}
+
+/* ========== DETAIL ========== */
+.detail-wrap {
+  border-top: 1px solid light-dark(#000, #555);
+  padding-top: 1rem;
+}
+
+.detail-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.detail-title {
+  font-size: 1em;
+  font-weight: bold;
+  font-family: "UDEV Gothic HSNFLG", ui-monospace, monospace;
+}
+
+.detail-meta {
+  font-size: 0.75em;
+  opacity: 0.45;
+  font-family: "UDEV Gothic HSNFLG", ui-monospace, monospace;
+}
+
+/* ----- 直近30日ヒートマップ（週行・上=古い週／下=最新週） ----- */
+#galleryspace {
+  --cal-border: light-dark(#ddd, #444);
+}
+
+/* 指標ごとに色味を分ける（凡例・セルとも .cal-card 配下の変数を参照） */
+.cal-card.cal-heat-posts {
+  --heat-0: light-dark(#f0f0f0, #2a2a2a);
+  --heat-1: light-dark(#ebedf0, #3a3a3a);
+  --heat-2: light-dark(#9be9a8, #14532d);
+  --heat-3: light-dark(#40c463, #15803d);
+  --heat-4: light-dark(#30a14e, #22c55e);
+  --heat-5: light-dark(#216e39, #4ade80);
+}
+.cal-card.cal-heat-plays {
+  --heat-0: light-dark(#f5f3ff, #2a2a2a);
+  --heat-1: light-dark(#ede9fe, #3a3a3a);
+  --heat-2: light-dark(#ddd6fe, #4c1d95);
+  --heat-3: light-dark(#a78bfa, #6d28d9);
+  --heat-4: light-dark(#7c3aed, #a78bfa);
+  --heat-5: light-dark(#5b21b6, #c4b5fd);
+}
+.cal-card.cal-heat-steps {
+  --heat-0: light-dark(#fff7ed, #2a2a2a);
+  --heat-1: light-dark(#ffedd5, #3a3a3a);
+  --heat-2: light-dark(#fed7aa, #9a3412);
+  --heat-3: light-dark(#fdba74, #c2410c);
+  --heat-4: light-dark(#fb923c, #ea580c);
+  --heat-5: light-dark(#ea580c, #fdba74);
+}
+/* 気温：原色の黄・橙・赤をやめ、寒色グレー → 暖色グレーのみで段階を表す */
+.cal-card.cal-heat-weather {
+  --heat-0: light-dark(#f0f1f3, #2a2a2a);
+  --heat-1: light-dark(#e8ecf1, #333940);
+  --heat-2: light-dark(#d9e1ea, #3d4752);
+  --heat-3: light-dark(#c5d0dc, #4a5563);
+  --heat-4: light-dark(#dcd6d2, #4a4541);
+  --heat-5: light-dark(#cfc4be, #554a43);
+}
+
+.cal-card {
+  margin-bottom: 0;
+  font-family: "UDEV Gothic HSNFLG", ui-monospace, monospace;
+  font-size: 11px;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* 週が増えても縦スクロール（モックは5週だがレイアウト用） */
+.cal-scroll {
+  max-height: min(22rem, 70vh);
+  overflow-y: auto;
+  overflow-x: auto;
+  border: 1px solid var(--cal-border);
+  border-radius: 4px;
+}
+.cal-scroll .cal-grid {
+  margin: 0;
+}
+
+.cal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.cal-month-line {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.cal-month-title {
+  font-size: 0.95em;
+  font-weight: bold;
+}
+
+.cal-today-btn {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 2px 6px;
+  font: inherit;
+  cursor: pointer;
+  opacity: 0.5;
+  font-size: 11px;
+}
+.cal-today-btn:hover {
+  opacity: 1;
+  background: light-dark(#000, #888);
+  color: light-dark(#fff, #fff);
+}
+
+.cal-grid {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.cal-grid th,
+.cal-grid td {
+  padding: 2px;
+  text-align: center;
+  vertical-align: middle;
+}
+.cal-grid thead th {
+  font-weight: normal;
+  opacity: 0.55;
+  font-size: 10px;
+  padding-bottom: 4px;
+}
+.cal-grid th.wn {
+  width: 2.2em;
+}
+.cal-grid .wn-cell {
+  padding-right: 4px;
+  vertical-align: middle;
+}
+.wn-btn {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 2px 0;
+  font: inherit;
+  font-size: 9px;
+  opacity: 0.55;
+  cursor: pointer;
+  border-radius: 2px;
+  color: inherit;
+}
+.wn-btn:hover {
+  opacity: 1;
+  background: light-dark(#00000014, #ffffff18);
+}
+.wn-btn:focus-visible {
+  outline: 2px solid light-dark(#06c, #8cf);
+  outline-offset: 1px;
+}
+.wn-btn.selected {
+  opacity: 1;
+  font-weight: bold;
+  background: light-dark(#0000001a, #ffffff22);
+}
+
+.cal-grid tbody tr.cal-week-selected {
+  background: light-dark(#00000008, #ffffff0a);
+}
+
+.cal-grid .day {
+  min-height: 1.75em;
+  line-height: 1.4;
+  padding: 3px 2px;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: background 0.1s, box-shadow 0.1s;
+}
+.cal-grid .day.other {
+  opacity: 0.35;
+}
+/* 閲覧範囲外（30日より前／最新日より後） */
+.cal-grid .day.out-of-range {
+  opacity: 0.38;
+  cursor: default;
+  filter: grayscale(0.35);
+}
+.cal-grid .day.out-of-range:hover {
+  background: inherit;
+}
+.cal-grid .day.today {
+  box-shadow: inset 0 0 0 1px light-dark(#000, #888);
+}
+.cal-grid .day.selected {
+  box-shadow: inset 0 0 0 2px light-dark(#00f, #8cf);
+}
+
+.cal-grid .day.h0 { background: var(--heat-0); }
+.cal-grid .day.h1 { background: var(--heat-1); }
+.cal-grid .day.h2 { background: var(--heat-2); color: light-dark(#000, #f5f5f5); }
+.cal-grid .day.h3 { background: var(--heat-3); color: #fff; }
+.cal-grid .day.h4 { background: var(--heat-4); color: #fff; }
+.cal-grid .day.h5 { background: var(--heat-5); color: #fff; }
+
+/* 歩数・気温は中間帯が明るいので文字色を調整 */
+.cal-card.cal-heat-steps .day.h5 {
+  color: light-dark(#431407, #fff7ed);
+}
+.cal-card.cal-heat-weather .day.h1,
+.cal-card.cal-heat-weather .day.h2,
+.cal-card.cal-heat-weather .day.h3,
+.cal-card.cal-heat-weather .day.h4,
+.cal-card.cal-heat-weather .day.h5 {
+  color: light-dark(#1e1e1e, #e8e8e8);
+}
+
+.cal-card .legend {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+  font-size: 10px;
+  opacity: 0.75;
+}
+
+.heat-metric-select {
+  font: inherit;
+  font-size: 11px;
+  padding: 1px 4px;
+  max-width: 10em;
+}
+
+.cal-card .lbox {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.heat-legend-axis {
+  margin-left: 4px;
+  opacity: 0.7;
+}
+
+/* 週サマリー（週番号クリック時） */
+.week-view-panel {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid light-dark(#000, #555);
+  font-family: "UDEV Gothic HSNFLG", ui-monospace, monospace;
+  font-size: 11px;
+}
+.week-view-panel.is-hidden {
+  display: none;
+}
+
+.week-weather-strip {
+  margin-top: 12px;
+  padding: 8px 0 4px;
+  border-top: 1px solid light-dark(#ddd, #444);
+  overflow-x: auto;
+}
+.ww-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+  opacity: 0.65;
+  font-size: 10px;
+}
+.ww-title { font-weight: bold; }
+.ww-row {
+  display: flex;
+  gap: 4px;
+  min-width: min-content;
+}
+.ww-cell {
+  flex: 0 0 auto;
+  width: 4.5rem;
+  padding: 4px 2px;
+  text-align: center;
+  font-size: 9px;
+  border-radius: 4px;
+  background: light-dark(#f8f8f8, #1e1e1e);
+  border: 1px solid light-dark(#e5e5e5, #333);
+}
+.ww-dow { opacity: 0.5; margin-bottom: 2px; }
+.ww-date { opacity: 0.75; margin-bottom: 3px; }
+.ww-icon { font-size: 14px; line-height: 1.2; margin-bottom: 2px; }
+.ww-temp { font-feature-settings: "tnum"; margin-bottom: 2px; }
+.ww-desc {
+  opacity: 0.55;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* stats */
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  margin-bottom: 1.2rem;
+  font-family: "UDEV Gothic HSNFLG", ui-monospace, monospace;
+}
+.stat-card { padding: 6px 8px 6px 0; }
+.stat-label { font-size: 9px; opacity: 0.45; margin-bottom: 2px; }
+.stat-val   { font-size: 1.25em; font-weight: bold; line-height: 1.2; }
+.stat-src   { font-size: 9px; opacity: 0.35; margin-top: 1px; }
+@media (max-width: 520px) {
+  .stat-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* /planet 内アイコン … misskeyio.webp, tanoshiisite.jpg, mistodon-cloud.jpg, cosense.png, last-fm-square-color-icon.svg など */
+.src-icon {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  flex-shrink: 0;
+  image-rendering: auto;
+}
+.stat-src .src-icon {
+  width: 12px;
+  height: 12px;
+  opacity: 0.9;
+}
+
+/* filter */
+.filter-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 0.75em;
+  font-family: "UDEV Gothic HSNFLG", ui-monospace, monospace;
+}
+.filter-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.filter-toggle-btn {
+  font: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 0;
+  color: inherit;
+  opacity: 0.85;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.filter-toggle-btn:hover { opacity: 1; }
+#filter-count { opacity: 0.55; }
+#filter-arrow { display: inline-block; min-width: 1em; }
+.filter-sep {
+  width: 1px;
+  height: 14px;
+  background: light-dark(#ccc, #555);
+  flex-shrink: 0;
+}
+
+.ftag {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 2px;
+  border: none;
+  cursor: pointer;
+  opacity: 0.3;
+  font-size: 11px;
+  line-height: 1.6;
+  transition: opacity 0.1s, background 0.1s, color 0.1s;
+}
+.ftag.on { opacity: 1; }
+.ftag:hover, .ftag.on:hover { background: black; color: white; opacity: 1; }
+.ftag:hover .src-icon[src$=".svg"],
+.ftag.on:hover .src-icon[src$=".svg"] {
+  filter: brightness(0) invert(1);
+}
+
+.filter-source-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  row-gap: 4px;
+  min-width: 0;
+}
+.filter-source-row.filter-source-row--collapsed {
+  display: none !important;
+}
+.ftag img:not(.src-icon) {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+.ftag .ficon {
+  font-size: 1em;
+  line-height: 1;
+}
+
+.filter-all {
+  padding: 0 2px;
+  border: none;
+  font-size: 11px;
+  line-height: 1.6;
+  opacity: 0.4;
+}
+.filter-all:hover { background: black; color: white; opacity: 1; }
+
+/* タイムライン表示日 */
+.timeline-date-bar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid light-dark(#ebebeb, #333);
+  font-family: "UDEV Gothic HSNFLG", ui-monospace, monospace;
+}
+.timeline-date-label {
+  font-size: 0.75em;
+  opacity: 0.45;
+  letter-spacing: 0.02em;
+}
+.timeline-date-nav-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  flex: 1 1 14rem;
+  justify-content: flex-end;
+}
+.timeline-today-btn {
+  appearance: none;
+  border: none;
+  background: none;
+  margin: 0;
+  padding: 1px 5px;
+  color: inherit;
+  font: inherit;
+  font-size: 0.75em;
+  font-weight: bold;
+  line-height: 1.2;
+  cursor: pointer;
+  flex-shrink: 0;
+  opacity: 0.45;
+  border-radius: 0;
+}
+.timeline-today-btn:hover:not(:disabled) {
+  opacity: 1;
+  background: light-dark(#00000012, #ffffff14);
+}
+.timeline-today-btn:focus-visible {
+  outline: 1px dashed light-dark(#666, #999);
+  outline-offset: 2px;
+}
+.timeline-today-btn:disabled {
+  opacity: 0.22;
+  cursor: default;
+}
+.timeline-date-sep {
+  opacity: 0.35;
+  font-weight: normal;
+  user-select: none;
+  flex-shrink: 0;
+  font-size: 0.85em;
+}
+.timeline-date-arrows-inner {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+.timeline-nav-btn {
+  appearance: none;
+  border: none;
+  background: none;
+  margin: 0;
+  padding: 1px 5px;
+  color: inherit;
+  font: inherit;
+  font-size: 0.95em;
+  font-weight: bold;
+  line-height: 1.2;
+  font-feature-settings: "tnum";
+  cursor: pointer;
+  flex-shrink: 0;
+  opacity: 0.42;
+  border-radius: 0;
+}
+.timeline-nav-btn:hover:not(:disabled) {
+  opacity: 1;
+  background: light-dark(#00000012, #ffffff14);
+}
+.timeline-nav-btn:focus-visible {
+  outline: 1px dashed light-dark(#666, #999);
+  outline-offset: 2px;
+}
+.timeline-nav-btn:disabled {
+  opacity: 0.18;
+  cursor: not-allowed;
+}
+.timeline-date-value {
+  font-size: 0.9em;
+  font-weight: bold;
+  font-feature-settings: "tnum";
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: center;
+  line-height: 1.35;
+}
+/* 週タイトルが長いとき：やや小さく折り返し（全文は title で） */
+.timeline-date-value.timeline-date-value--week {
+  font-size: 0.78em;
+  font-weight: bold;
+  text-wrap: balance;
+  hyphens: auto;
+}
+@media (max-width: 480px) {
+  .timeline-date-value.timeline-date-value--week {
+    font-size: 0.72em;
+  }
+}
+
+/* timeline */
+.timeline { display: flex; flex-direction: column; gap: 0; }
+
+.tl-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid light-dark(#ebebeb, #333);
+  font-size: 0.85em;
+}
+.tl-item:first-child { border-top: 1px solid light-dark(#ebebeb, #333); }
+.tl-item.hidden { display: none; }
+
+.tl-time {
+  font-size: 10px;
+  opacity: 0.35;
+  min-width: 34px;
+  padding-top: 0;
+  font-family: "UDEV Gothic HSNFLG", ui-monospace, monospace;
+  font-feature-settings: "tnum";
+  flex-shrink: 0;
+}
+a.tl-time.tl-time--link {
+  color: inherit;
+  text-decoration: none;
+}
+a.tl-time.tl-time--link:hover {
+  opacity: 0.75;
+  color: #fff;
+  text-decoration: underline;
+}
+a.tl-time.tl-time--link::after {
+    background-image: none;
+    transform: translateY(-3px);
+}
+a.tl-time.tl-time--link:hover::after {
+    background-image: url('/external_link-icon1x2.png');
+    transform: translateY(-3px);
+}
+
+.tl-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  line-height: 1.5;
+  opacity: 0.45;
+  font-family: "UDEV Gothic HSNFLG", ui-monospace, monospace;
+  padding-top: 1px;
+}
+.tl-badge .src-icon {
+  width: 12px;
+  height: 12px;
+  opacity: 0.95;
+}
+.tl-badge .ficon {
+  font-size: 11px;
+  line-height: 1.4;
+  padding-left: 4px;
+}
+button.tl-badge {
+  appearance: none;
+  border: none;
+  background: none;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+button.tl-badge:hover,
+button.tl-badge:focus-visible {
+  opacity: 0.9;
+}
+button.tl-badge:focus-visible {
+  outline: 1px dotted light-dark(#000, #fff);
+  outline-offset: 2px;
+}
+
+.tl-content { flex: 1; min-width: 0; padding-top: 2px; }
+.tl-text { line-height: 1.1; }
+.tl-sub  { font-size: 10px; opacity: 0.5; margin-top: 1px; }
+
+.no-items { font-size: 0.85em; opacity: 0.4; padding: 10px 0; display: none; }
+
+@media (max-width: 768px) {
+  #main { width: 90%; margin-top: 40px; }
+}
+  </style>
+</head>
+
+<body>
+  <div id="wrapper">
+    <header id="header">
+      <div id="header-flex">
+        <nav id="back" aria-label="戻るナビゲーション">
+          <a id="backicon" href="../index.html">
+            &lt;
+          </a>
+        </nav>
+        <nav id="address" class="addressbar" aria-label="パンくずナビゲーション">
+          <ol class="breadcrumb">
+            <li><a href="../index.html">100%health</a></li>
+            <li aria-current="page"><a href="planet-mockup.html">planet yuinoid</a></li>
+          </ol>
+        </nav>
+      </div>
+    </header>
+    <main id="main">
+      <header id="category-header">
+        <nav aria-label="カテゴリナビゲーション">
+          <ol class="main-category">
+            <li><a href="/aboutme.html">about</a></li>
+            <li><a href="/gallery/gallery_main.html">gallery</a></li>
+            <li><a href="/works/works_main.html">works</a></li>
+            <li><a href="/txt/txt_main.html">txt</a></li>
+            <li><a href="/links/links_main.html">links</a></li>
+          </ol>
+          <ol class="sub-category">
+            <li><a href="planet-mockup.html">planet yuinoid</a></li>
+          </ol>
+        </nav>
+      </header>
+      <article id="galleryspace">
+        <h1 class="title">planet yuinoid</h1>
+
+        <section class="summary-wrap">
+          <div class="section-label">// calendar</div>
+          <div class="card cal-card cal-heat-posts" id="cal-card" data-metric="posts">
+            <div class="cal-header">
+              <div class="cal-month-line">
+                <span class="cal-month-title" id="cal-month-title"></span>
+                <button type="button" class="cal-today-btn" id="cal-btn-latest" title="最新日（2026-04-15）を選択">最新</button>
+              </div>
+            </div>
+            <div class="cal-scroll">
+              <table class="cal-grid" aria-label="直近30日のヒートマップ">
+                <thead>
+                  <tr>
+                    <th class="wn" scope="col"><span class="sr-only">週</span></th>
+                    <th scope="col">月</th>
+                    <th scope="col">火</th>
+                    <th scope="col">水</th>
+                    <th scope="col">木</th>
+                    <th scope="col">金</th>
+                    <th scope="col">土</th>
+                    <th scope="col">日</th>
+                  </tr>
+                </thead>
+                <tbody id="cal-body" aria-busy="true"></tbody>
+              </table>
+            </div>
+            <div class="legend">
+              <label class="heat-metric-label">
+                <span class="sr-only">ヒートマップの指標</span>
+                <select id="heat-metric" class="heat-metric-select" title="ヒートマップの指標">
+                  <option value="posts">投稿数</option>
+                  <option value="plays">再生曲数</option>
+                  <option value="steps">歩数</option>
+                  <option value="weather">最高気温</option>
+                </select>
+              </label>
+              <div class="lbox" style="border:0.5px solid var(--cal-border)"></div>
+              <div class="lbox" style="background:var(--heat-1)"></div>
+              <div class="lbox" style="background:var(--heat-2)"></div>
+              <div class="lbox" style="background:var(--heat-3)"></div>
+              <div class="lbox" style="background:var(--heat-4)"></div>
+              <div class="lbox" style="background:var(--heat-5)"></div>
+              <span id="heat-legend-axis" class="heat-legend-axis">少 → 多</span>
+            </div>
+          </div>
+
+          <div id="week-view-panel" class="week-view-panel" aria-live="polite">
+            <div id="week-weather-strip" class="week-weather-strip">
+              <div class="ww-head">
+                <span class="ww-title">この週の天気</span>
+                <span class="ww-loc">Nagoya</span>
+              </div>
+              <div id="week-weather-row" class="ww-row"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- DETAIL -->
+        <section class="detail-wrap">
+          <div class="detail-header">
+            <span class="detail-title">&gt; timeline</span>
+            <span class="detail-meta" id="detail-meta">// 直近30日</span>
+          </div>
+
+          <div class="stat-row" id="timeline-stat-row">
+            <div class="stat-card" id="stat-posts">
+              <div class="stat-label">投稿数</div>
+              <div class="stat-val">18</div>
+              <div class="stat-src">Misskey 18 / Mastodon 0</div>
+            </div>
+            <div class="stat-card" id="stat-plays">
+              <div class="stat-label">再生曲数</div>
+              <div class="stat-val">35</div>
+              <div class="stat-src">Last.fm</div>
+            </div>
+            <div class="stat-card" id="stat-steps">
+              <div class="stat-label">歩数</div>
+              <div class="stat-val">8</div>
+              <div class="stat-src">Apple Watch</div>
+            </div>
+            <div class="stat-card" id="stat-weather">
+              <div class="stat-label">天気</div>
+              <div class="stat-val">🌧 小雨 18.9°</div>
+              <div class="stat-src">Nagoya</div>
+            </div>
+          </div>
+
+          <div class="filter-bar" id="filter-bar">
+            <div class="filter-header">
+              <button type="button" id="filter-toggle" class="filter-toggle-btn" title="ソースフィルターを展開/折りたたむ" aria-expanded="false" aria-controls="filter-source-row">フィルター <span id="filter-count">全20</span> <span id="filter-arrow">▾</span></button>
+              <button type="button" class="filter-all" onclick="filterAll()">すべて</button>
+              <span class="filter-sep" aria-hidden="true"></span>
+              <button type="button" id="media-filter-btn" class="ftag f-rss" title="画像・動画が添付された投稿のみ表示" onclick="toggleMediaFilter(this)"><span class="ficon">📷</span>メディア</button>
+            </div>
+            <div id="filter-source-row" class="filter-source-row filter-source-row--collapsed">
+              <button type="button" class="ftag f-msk on" data-src="2" title="tanoshii.site @health" onclick="toggleFilter(this)"><img class="src-icon" src="tanoshiisite.jpg" alt="" width="16" height="16" loading="lazy"><span class="ficon" hidden>🍣</span>tanoshii</button>
+              <button type="button" class="ftag f-msk on" data-src="1" title="misskey.io @yuinoid" onclick="toggleFilter(this)"><img class="src-icon" src="misskeyio.webp" alt="" width="16" height="16" loading="lazy"><span class="ficon" hidden>🍣</span>yuinoid@misskey.io</button>
+              <button type="button" class="ftag f-msk on" data-src="13" title="sushi.ski @idoko" onclick="toggleFilter(this)"><img class="src-icon" src="misskeyio.webp" alt="" width="16" height="16" loading="lazy"><span class="ficon" hidden>🍣</span>idoko@sushi.ski</button>
+              <button type="button" class="ftag f-msk on" data-src="15" title="pon.icu @health (archived)" onclick="toggleFilter(this)"><img class="src-icon" src="https://pon.icu/favicon.ico" alt="" width="16" height="16" loading="lazy"><span class="ficon" hidden>🍣</span>pon.icu</button>
+              <button type="button" class="ftag f-msk on" data-src="16" title="groundpolis.app @healthcare (archived)" onclick="toggleFilter(this)"><img class="src-icon" src="https://groundpolis.app/favicon.ico" alt="" width="16" height="16" loading="lazy"><span class="ficon" hidden>🍣</span>g.app</button>
+              <button type="button" class="ftag f-msk on" data-src="12" title="msk.ilnk.info @google" onclick="toggleFilter(this)"><img class="src-icon" src="https://msk.ilnk.info/favicon.ico" alt="" width="16" height="16" loading="lazy"><span class="ficon" hidden>🍣</span>google@msk.ilnk.info</button>
+              <button type="button" class="ftag f-msk on" data-src="11" title="misskey.io @vknsq" onclick="toggleFilter(this)"><img class="src-icon" src="misskeyio.webp" alt="" width="16" height="16" loading="lazy"><span class="ficon" hidden>🍣</span>vknsq@misskey.io</button>
+              <button type="button" class="ftag f-mst on" data-src="3" title="mistodon.cloud @healthcare" onclick="toggleFilter(this)"><img class="src-icon" src="mistodon-cloud.jpg" alt="" width="16" height="16" loading="lazy"><span class="ficon" hidden>🐘</span>mistodon</button>
+              <button type="button" class="ftag f-mst on" data-src="14" title="mastodon.cloud @objtus" onclick="toggleFilter(this)"><img class="src-icon" src="mistodon-cloud.jpg" alt="" width="16" height="16" loading="lazy"><span class="ficon" hidden>🐘</span>masto.cloud</button>
+              <button type="button" class="ftag f-rss on" data-src="5" title="yuinoid.neocities.org RSS" onclick="toggleFilter(this)"><img class="src-icon" src="../icon.webp" alt="" width="16" height="16" loading="lazy"><span class="ficon" hidden>🌐</span>100%health</button>
+              <button type="button" class="ftag f-rss on" data-src="8" title="GitHub" onclick="toggleFilter(this)"><img class="src-icon" src="https://github.com/favicon.ico" alt="" width="16" height="16" loading="lazy"><span class="ficon" hidden>🐱</span>github</button>
+              <button type="button" class="ftag f-rss on" data-src="7" title="OpenWeatherMap" onclick="toggleFilter(this)"><span class="ficon">☁️</span>weather</button>
+              <button type="button" class="ftag f-lfm on" data-src="4" title="Last.fm objtus" onclick="toggleFilter(this)"><img class="src-icon" src="last-fm-square-color-icon.svg" alt="" width="16" height="16" loading="lazy"><span class="ficon" hidden>🎵</span>last.fm</button>
+              <button type="button" class="ftag f-hlth on" data-src="9" title="iPhone ヘルス" onclick="toggleFilter(this)"><span class="ficon">🍎</span>health</button>
+              <button type="button" class="ftag f-hlth on" data-src="10" title="iPhone 写真" onclick="toggleFilter(this)"><span class="ficon">📷</span>photo</button>
+              <button type="button" class="ftag f-rss on" data-src="6" title="YouTube" onclick="toggleFilter(this)"><img class="src-icon" src="https://www.youtube.com/favicon.ico" alt="" width="16" height="16" loading="lazy"><span class="ficon" hidden>▶️</span>youtube</button>
+              <button type="button" class="ftag f-rss on" data-src="17" title="Cosense stall" onclick="toggleFilter(this)"><img class="src-icon" src="cosense.png" alt="" width="16" height="16" loading="lazy"><span class="ficon" hidden>📓</span>cosense</button>
+              <button type="button" class="ftag f-hlth on" data-src="18" title="Jomo スクリーンタイム" onclick="toggleFilter(this)"><span class="ficon">📱</span>screentime</button>
+              <button type="button" class="ftag f-rss on" data-src="19" title="Netflix" onclick="toggleFilter(this)"><img class="src-icon" src="https://www.netflix.com/favicon.ico" alt="" width="16" height="16" loading="lazy"><span class="ficon" hidden>🎬</span>netflix</button>
+              <button type="button" class="ftag f-rss on" data-src="20" title="Amazon Prime Video" onclick="toggleFilter(this)"><img class="src-icon" src="https://www.primevideo.com/favicon.ico" alt="" width="16" height="16" loading="lazy"><span class="ficon" hidden>📺</span>prime</button>
+            </div>
+          </div>
+
+          <div class="timeline-date-bar" id="timeline-date-bar" aria-live="polite">
+            <span class="timeline-date-label">// viewing</span>
+            <div class="timeline-date-nav-wrap">
+              <button type="button" class="timeline-today-btn" id="timeline-nav-today" title="最新日のビューへ">今日</button>
+              <span class="timeline-date-sep" aria-hidden="true">|</span>
+              <div class="timeline-date-arrows-inner">
+                <button type="button" class="timeline-nav-btn" id="timeline-nav-prev" aria-label="前へ" title="前へ">‹</button>
+                <span class="timeline-date-value" id="timeline-view-date" role="status" data-date="" data-view=""></span>
+                <button type="button" class="timeline-nav-btn" id="timeline-nav-next" aria-label="次へ" title="次へ">›</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="timeline" id="timeline">
+            <div class="tl-item" data-src="2" data-has-media="true">
+              <span class="tl-time">10:32</span>
+              <button type="button" class="tl-badge tl-badge--filter" title="ソースで絞り込み（もう一度クリックで解除）" onclick="filterToSingleSourceFromBadge(this)"><img class="src-icon" src="tanoshiisite.jpg" width="12" height="12" alt=""></button>
+              <div class="tl-content"><div class="tl-text">らくがきしたい</div></div>
+            </div>
+            <div class="tl-item" data-src="4">
+              <span class="tl-time">11:04</span>
+              <button type="button" class="tl-badge tl-badge--filter" title="ソースで絞り込み（もう一度クリックで解除）" onclick="filterToSingleSourceFromBadge(this)"><img class="src-icon" src="last-fm-square-color-icon.svg" width="12" height="12" alt=""></button>
+              <div class="tl-content"><div class="tl-text">Tame Impala — Feels Like We Only Go Backwards</div></div>
+            </div>
+            <div class="tl-item" data-src="1" data-has-media="true">
+              <span class="tl-time">12:15</span>
+              <button type="button" class="tl-badge tl-badge--filter" title="ソースで絞り込み（もう一度クリックで解除）" onclick="filterToSingleSourceFromBadge(this)"><img class="src-icon" src="misskeyio.webp" width="12" height="12" alt=""></button>
+              <div class="tl-content"><div class="tl-text">雑記を増やしていきたい</div></div>
+            </div>
+            <div class="tl-item" data-src="3">
+              <span class="tl-time">13:21</span>
+              <button type="button" class="tl-badge tl-badge--filter" title="ソースで絞り込み（もう一度クリックで解除）" onclick="filterToSingleSourceFromBadge(this)"><img class="src-icon" src="mistodon-cloud.jpg" width="12" height="12" alt=""></button>
+              <div class="tl-content"><div class="tl-sub">BT: 情報のドブ川</div></div>
+            </div>
+            <div class="tl-item" data-src="13" data-has-media="true">
+              <span class="tl-time">14:50</span>
+              <button type="button" class="tl-badge tl-badge--filter" title="ソースで絞り込み（もう一度クリックで解除）" onclick="filterToSingleSourceFromBadge(this)"><img class="src-icon" src="misskeyio.webp" width="12" height="12" alt=""></button>
+              <div class="tl-content"><div class="tl-text">逆にね、どうでもよくなってきたよ、逆にね</div></div>
+            </div>
+            <div class="tl-item" data-src="14">
+              <span class="tl-time">15:30</span>
+              <button type="button" class="tl-badge tl-badge--filter" title="ソースで絞り込み（もう一度クリックで解除）" onclick="filterToSingleSourceFromBadge(this)"><img class="src-icon" src="mistodon-cloud.jpg" width="12" height="12" alt=""></button>
+              <div class="tl-content"><div class="tl-text">LTLのふいんき、これくらいがちょうどいいな</div></div>
+            </div>
+            <div class="tl-item" data-src="5">
+              <span class="tl-time">16:00</span>
+              <button type="button" class="tl-badge tl-badge--filter" title="ソースで絞り込み（もう一度クリックで解除）" onclick="filterToSingleSourceFromBadge(this)"><img class="src-icon" src="../icon.webp" width="12" height="12" alt=""></button>
+              <div class="tl-content"><div class="tl-text">雑記: 個人サイトを更新しました</div></div>
+            </div>
+            <div class="tl-item" data-src="1">
+              <span class="tl-time">16:36</span>
+              <button type="button" class="tl-badge tl-badge--filter" title="ソースで絞り込み（もう一度クリックで解除）" onclick="filterToSingleSourceFromBadge(this)"><img class="src-icon" src="misskeyio.webp" width="12" height="12" alt=""></button>
+              <div class="tl-content"><div class="tl-text">スレッド含めおもしろい</div></div>
+            </div>
+            <div class="tl-item" data-src="9">
+              <span class="tl-time">23:00</span>
+              <button type="button" class="tl-badge tl-badge--filter" title="ソースで絞り込み（もう一度クリックで解除）" onclick="filterToSingleSourceFromBadge(this)"><span class="ficon">🍎</span></button>
+              <div class="tl-content"><div class="tl-text">7,842歩 / 420kcal / 72bpm</div></div>
+            </div>
+          </div>
+          <div class="no-items" id="no-items">// no items</div>
+        </section>
+      </article>
+    </main>
+    <footer id="main-footer">
+      <!-- main.jsから#footerへfooter.htmlの挿入 -->
+      <div id="footerhtml"></div>
+    </footer>
+  </div>
+
+  <script>
+const DAYS_JA = ['日','月','火','水','木','金','土'];
+
+/** モック: データ上の最新日（これより後の日はグレーアウト） */
+const CAL_LATEST = new Date(2026, 3, 15);
+const CAL_WINDOW_DAYS = 30;
+
+function getCalLatestIso() {
+  return isoFromDate(new Date(CAL_LATEST));
+}
+
+function getCalOldestIso() {
+  const latest = new Date(CAL_LATEST);
+  const oldest = new Date(latest);
+  oldest.setDate(oldest.getDate() - (CAL_WINDOW_DAYS - 1));
+  return isoFromDate(oldest);
+}
+
+let calSelectedIso;
+/** カレンダーに表示中の各行の月曜日 ISO（上→下） */
+let calendarWeekMondays = [];
+/** 'day' | 'week' | 'month' | 'year' */
+let calViewMode = 'week';
+/** 選択中の週の月曜日 ISO */
+let calSelectedWeekMonday = null;
+
+function pad2(n) {
+  return String(n).padStart(2, '0');
+}
+
+function isoFromDate(d) {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
+function startOfDay(d) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+function dayCmp(a, b) {
+  return startOfDay(a).getTime() - startOfDay(b).getTime();
+}
+
+/** 月曜始まりの週の月曜日 */
+function getMonday(d) {
+  const x = startOfDay(d);
+  const dow = (x.getDay() + 6) % 7;
+  x.setDate(x.getDate() - dow);
+  return x;
+}
+
+function parseIsoLocal(iso) {
+  const p = iso.split('-').map(Number);
+  return new Date(p[0], p[1] - 1, p[2]);
+}
+
+/** 最新日（CAL_LATEST）より後は天気データなし（モック） */
+function isAfterLatestDataDay(d) {
+  return dayCmp(startOfDay(d), startOfDay(new Date(CAL_LATEST))) > 0;
+}
+
+/** 週の7日それぞれの天気セル（モック） */
+function mockWeatherCell(iso) {
+  const d = parseIsoLocal(iso);
+  const dowJa = DAYS_JA[d.getDay()];
+  const md = `${d.getMonth() + 1}/${pad2(d.getDate())}`;
+  if (isAfterLatestDataDay(d)) {
+    return {
+      title: 'データなし',
+      dow: dowJa,
+      date: md,
+      icon: '🌡',
+      hi: '—',
+      lo: '—',
+      desc: '—'
+    };
+  }
+  let h = 0;
+  const s = iso + 'wx';
+  for (let i = 0; i < s.length; i++) h = Math.imul(31, h) + s.charCodeAt(i) | 0;
+  h = Math.abs(h);
+  if (h % 6 === 0) {
+    return { title: '', dow: dowJa, date: md, icon: '🌡', hi: '—', lo: '—', desc: '—' };
+  }
+  const icons = ['☀️', '☁️', '🌧'];
+  const descs = ['晴れ', '厚い雲', '小雨'];
+  const ix = h % 3;
+  const hi = 16 + (h % 12);
+  const lo = hi - 4;
+  return {
+    title: descs[ix],
+    dow: dowJa,
+    date: md,
+    icon: icons[ix],
+    hi: `${hi}°`,
+    lo: `${lo}°`,
+    desc: descs[ix]
+  };
+}
+
+function setTimelineStatCard(cardId, val, src) {
+  const card = document.getElementById(cardId);
+  if (!card) return;
+  const v = card.querySelector('.stat-val');
+  const s = card.querySelector('.stat-src');
+  if (v) v.textContent = val;
+  if (s) s.textContent = src;
+}
+
+/** 日単位（タイムライン下の stat-row と揃える） */
+function updateTimelineStatsForDay(iso) {
+  const posts = mockMetricValue(iso, 'posts');
+  const plays = mockMetricValue(iso, 'plays');
+  const steps = mockMetricValue(iso, 'steps');
+  const w = mockMetricValue(iso, 'weather');
+  const mk = Math.max(0, Math.floor(posts * 0.94));
+  const mast = posts - mk;
+  setTimelineStatCard('stat-posts', String(posts), `Misskey ${mk} / Mastodon ${mast}`);
+  setTimelineStatCard('stat-plays', String(plays), 'Last.fm');
+  setTimelineStatCard('stat-steps', steps.toLocaleString('ja-JP'), 'Apple Watch');
+  setTimelineStatCard('stat-weather', `最高 ${w}°`, 'Nagoya');
+}
+
+function setTimelineViewWeek(mondayIso) {
+  const el = document.getElementById('timeline-view-date');
+  if (!el || !mondayIso) return;
+  const mon = parseIsoLocal(mondayIso);
+  const sun = new Date(mon);
+  sun.setDate(mon.getDate() + 6);
+  const wk = isoWeekNumber(mon);
+  const y = mon.getFullYear();
+  const full = `${y}年 第${wk}週（${mon.getMonth() + 1}月${mon.getDate()}日〜${sun.getMonth() + 1}月${sun.getDate()}日）`;
+  el.textContent = full;
+  el.title = full;
+  el.dataset.date = mondayIso;
+  el.dataset.view = 'week';
+  el.classList.add('timeline-date-value--week');
+}
+
+function updateWeekPanel(mondayIso) {
+  if (!mondayIso) return;
+
+  setTimelineViewWeek(mondayIso);
+
+  const mon = parseIsoLocal(mondayIso);
+  let sumPosts = 0;
+  let sumPlays = 0;
+  let sumSteps = 0;
+  const temps = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(mon);
+    d.setDate(mon.getDate() + i);
+    const iso = isoFromDate(d);
+    sumPosts += mockMetricValue(iso, 'posts');
+    sumPlays += mockMetricValue(iso, 'plays');
+    sumSteps += mockMetricValue(iso, 'steps');
+    if (!isAfterLatestDataDay(d)) temps.push(mockMetricValue(iso, 'weather'));
+  }
+  let weatherVal = '—';
+  let weatherSrc = '—  Nagoya';
+  if (temps.length) {
+    const avgT = (temps.reduce((a, b) => a + b, 0) / temps.length).toFixed(1);
+    const minT = Math.min(...temps);
+    const maxT = Math.max(...temps);
+    weatherVal = `平均 ${avgT}°`;
+    weatherSrc = `${minT}° – ${maxT}°  Nagoya`;
+  }
+
+  const mk = Math.max(0, Math.floor(sumPosts * 0.94));
+  const mast = sumPosts - mk;
+
+  setTimelineStatCard('stat-posts', String(sumPosts), `合計  Misskey ${mk} / Mastodon ${mast}`);
+  setTimelineStatCard('stat-plays', String(sumPlays), 'Last.fm 合計');
+  setTimelineStatCard('stat-steps', sumSteps.toLocaleString('ja-JP'), 'Apple Watch 合計');
+  setTimelineStatCard('stat-weather', weatherVal, weatherSrc);
+
+  const row = document.getElementById('week-weather-row');
+  if (row) {
+    row.innerHTML = '';
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(mon);
+      d.setDate(mon.getDate() + i);
+      const iso = isoFromDate(d);
+      const wx = mockWeatherCell(iso);
+      const cell = document.createElement('div');
+      cell.className = 'ww-cell';
+      cell.title = wx.title || wx.desc;
+      cell.innerHTML =
+        `<div class="ww-dow">${wx.dow}</div>` +
+        `<div class="ww-date">${wx.date}</div>` +
+        `<div class="ww-icon" aria-hidden="true">${wx.icon}</div>` +
+        `<div class="ww-temp">${wx.hi} / ${wx.lo}</div>` +
+        `<div class="ww-desc">${wx.desc}</div>`;
+      row.appendChild(cell);
+    }
+  }
+}
+
+function setWeekPanelVisible(show) {
+  const panel = document.getElementById('week-view-panel');
+  if (!panel) return;
+  panel.classList.toggle('is-hidden', !show);
+}
+
+/** 月内の各日のモック値（指標ごとに決定的） */
+function mockMetricValue(iso, metric) {
+  let h = 0;
+  const s = iso + metric;
+  for (let i = 0; i < s.length; i++) h = Math.imul(31, h) + s.charCodeAt(i) | 0;
+  h = Math.abs(h);
+  switch (metric) {
+    case 'posts': return h % 45;
+    case 'plays': return h % 95;
+    case 'steps': return 2500 + (h % 14500);
+    case 'weather': return 6 + (h % 24);
+    default: return 0;
+  }
+}
+
+function heatLevel(val, arr, metric) {
+  if (metric !== 'weather' && val === 0) return 0;
+  const vmin = Math.min(...arr);
+  const vmax = Math.max(...arr);
+  if (vmin === vmax) return metric !== 'weather' && val === 0 ? 0 : 3;
+  const t = (val - vmin) / (vmax - vmin);
+  const lv = Math.ceil(t * 5);
+  return Math.max(1, Math.min(5, lv === 0 ? 1 : lv));
+}
+
+function formatMetricTitle(iso, val, metric) {
+  if (metric === 'steps') return `${iso}  ${val.toLocaleString('ja-JP')}歩`;
+  if (metric === 'weather') return `${iso}  最高 ${val}°C`;
+  const u = metric === 'posts' ? '件' : '曲';
+  return `${iso}  ${val}${u}`;
+}
+
+/** ISO 週番号（その週の月〜日のいずれかの日付を渡す） */
+function isoWeekNumber(d) {
+  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const day = (x.getDay() + 6) % 7;
+  x.setDate(x.getDate() - day + 3);
+  const y = new Date(x.getFullYear(), 0, 4);
+  return 1 + Math.round((x - y) / 604800000);
+}
+
+function buildCalendarHeat() {
+  const body = document.getElementById('cal-body');
+  const titleEl = document.getElementById('cal-month-title');
+  const metricEl = document.getElementById('heat-metric');
+  if (!body || !titleEl || !metricEl) return;
+
+  const latest = new Date(CAL_LATEST);
+  const oldest = new Date(latest);
+  oldest.setDate(oldest.getDate() - (CAL_WINDOW_DAYS - 1));
+
+  const metric = metricEl.value;
+
+  titleEl.textContent =
+    `直近${CAL_WINDOW_DAYS}日（${oldest.getMonth() + 1}/${oldest.getDate()}〜${latest.getMonth() + 1}/${latest.getDate()}）· 最新 ${latest.getFullYear()}-${pad2(latest.getMonth() + 1)}-${pad2(latest.getDate())}`;
+
+  const inWindowDates = [];
+  const iter = new Date(oldest);
+  while (dayCmp(iter, latest) <= 0) {
+    inWindowDates.push(isoFromDate(new Date(iter)));
+    iter.setDate(iter.getDate() + 1);
+  }
+
+  const valuesInWindow = inWindowDates.map(iso => mockMetricValue(iso, metric));
+
+  if (!calSelectedIso || !inWindowDates.includes(calSelectedIso)) {
+    calSelectedIso = isoFromDate(latest);
+  }
+
+  const topMonday = getMonday(oldest);
+  const bottomMonday = getMonday(latest);
+
+  body.setAttribute('aria-busy', 'true');
+  body.innerHTML = '';
+  calendarWeekMondays = [];
+
+  if (calSelectedWeekMonday === null) {
+    calSelectedWeekMonday = isoFromDate(bottomMonday);
+  }
+
+  const cur = new Date(topMonday);
+  while (dayCmp(cur, bottomMonday) <= 0) {
+    const monIso = isoFromDate(new Date(cur));
+    calendarWeekMondays.push(monIso);
+
+    const tr = document.createElement('tr');
+    const wnTd = document.createElement('td');
+    wnTd.className = 'wn-cell';
+    const wnBtn = document.createElement('button');
+    wnBtn.type = 'button';
+    wnBtn.className = 'wn-btn';
+    const wk = isoWeekNumber(cur);
+    wnBtn.textContent = `W${wk}`;
+    wnBtn.title = `${cur.getFullYear()}年 第${wk}週を表示`;
+    wnBtn.dataset.weekStart = monIso;
+    wnBtn.classList.toggle('selected', calViewMode === 'week' && calSelectedWeekMonday === monIso);
+    wnBtn.addEventListener('click', function () {
+      calViewMode = 'week';
+      calSelectedWeekMonday = this.dataset.weekStart;
+      setWeekPanelVisible(true);
+      updateWeekPanel(calSelectedWeekMonday);
+      buildCalendarHeat();
+    });
+    wnTd.appendChild(wnBtn);
+    tr.appendChild(wnTd);
+
+    tr.classList.toggle('cal-week-selected', calViewMode === 'week' && calSelectedWeekMonday === monIso);
+
+    const rowStart = new Date(cur);
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(rowStart);
+      d.setDate(rowStart.getDate() + i);
+      const iso = isoFromDate(d);
+      const inWindow = dayCmp(d, oldest) >= 0 && dayCmp(d, latest) <= 0;
+      const isLatestDay =
+        d.getFullYear() === latest.getFullYear() &&
+        d.getMonth() === latest.getMonth() &&
+        d.getDate() === latest.getDate();
+
+      const td = document.createElement('td');
+      const div = document.createElement('div');
+      div.className = 'day';
+      div.textContent = String(d.getDate());
+
+      if (inWindow) {
+        const val = mockMetricValue(iso, metric);
+        const lv = heatLevel(val, valuesInWindow, metric);
+        div.classList.add(`h${lv}`);
+        div.dataset.date = iso;
+        div.title = formatMetricTitle(iso, val, metric);
+        if (calViewMode === 'day' && iso === calSelectedIso) div.classList.add('selected');
+        if (isLatestDay) div.classList.add('today');
+        const isoClick = iso;
+        div.addEventListener('click', function () {
+          calSelectedIso = isoClick;
+          calViewMode = 'day';
+          calSelectedWeekMonday = isoFromDate(getMonday(parseIsoLocal(isoClick)));
+          setWeekPanelVisible(false);
+          updateTimelineStatsForDay(isoClick);
+          const p = isoClick.split('-').map(Number);
+          setTimelineViewDate(new Date(p[0], p[1] - 1, p[2]));
+          buildCalendarHeat();
+        });
+      } else {
+        div.classList.add('h0', 'out-of-range');
+        if (dayCmp(d, latest) > 0) {
+          div.title = `${iso}（最新日より後·閲覧外）`;
+        } else {
+          div.title = `${iso}（直近${CAL_WINDOW_DAYS}日より前·閲覧外）`;
+        }
+      }
+
+      td.appendChild(div);
+      tr.appendChild(td);
+    }
+
+    cur.setDate(cur.getDate() + 7);
+    body.appendChild(tr);
+  }
+
+  if (calendarWeekMondays.length && calSelectedWeekMonday && !calendarWeekMondays.includes(calSelectedWeekMonday)) {
+    calSelectedWeekMonday = calendarWeekMondays[calendarWeekMondays.length - 1];
+  }
+  if (calViewMode === 'week' && calSelectedWeekMonday) {
+    updateWeekPanel(calSelectedWeekMonday);
+    setWeekPanelVisible(true);
+  } else {
+    setWeekPanelVisible(false);
+    updateTimelineStatsForDay(calSelectedIso);
+    const p = calSelectedIso.split('-').map(Number);
+    setTimelineViewDate(new Date(p[0], p[1] - 1, p[2]));
+  }
+
+  updateTimelineNavButtons();
+  body.setAttribute('aria-busy', 'false');
+  requestAnimationFrame(function () {
+    const wrap = body.closest('.cal-scroll');
+    if (wrap) wrap.scrollTop = wrap.scrollHeight;
+  });
+}
+
+function goCalLatest() {
+  calSelectedIso = isoFromDate(new Date(CAL_LATEST));
+  calViewMode = 'day';
+  calSelectedWeekMonday = isoFromDate(getMonday(new Date(CAL_LATEST)));
+  setWeekPanelVisible(false);
+  setTimelineViewDate(new Date(CAL_LATEST));
+  updateTimelineStatsForDay(calSelectedIso);
+  buildCalendarHeat();
+}
+
+function syncViewDateFromCal() {
+  if (calViewMode === 'week' && calSelectedWeekMonday) {
+    updateWeekPanel(calSelectedWeekMonday);
+    return;
+  }
+  if (!calSelectedIso) {
+    setTimelineViewDate(new Date(CAL_LATEST));
+    updateTimelineStatsForDay(isoFromDate(new Date(CAL_LATEST)));
+    return;
+  }
+  const p = calSelectedIso.split('-').map(Number);
+  setTimelineViewDate(new Date(p[0], p[1] - 1, p[2]));
+  updateTimelineStatsForDay(calSelectedIso);
+}
+
+/** タイムライン上部「表示日」（モックは当日。日付切り替え時はこの要素を更新） */
+function formatTimelineViewDate(d) {
+  return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}（${DAYS_JA[d.getDay()]}）`;
+}
+
+function setTimelineViewDate(date) {
+  const el = document.getElementById('timeline-view-date');
+  if (!el) return;
+  const d = date instanceof Date ? date : new Date();
+  const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  el.dataset.date = iso;
+  el.dataset.view = 'day';
+  el.textContent = formatTimelineViewDate(d);
+  el.classList.remove('timeline-date-value--week');
+  el.removeAttribute('title');
+}
+
+function updateTimelineNavButtons() {
+  const prev = document.getElementById('timeline-nav-prev');
+  const next = document.getElementById('timeline-nav-next');
+  const todayBtn = document.getElementById('timeline-nav-today');
+  const latest = getCalLatestIso();
+  const curIso = calSelectedIso || latest;
+  const onLatestDay = calViewMode === 'day' && curIso === latest;
+
+  if (todayBtn) {
+    todayBtn.disabled = onLatestDay;
+    todayBtn.title = onLatestDay ? 'すでに最新日を表示中' : '最新日のビューへ';
+    todayBtn.setAttribute('aria-label', todayBtn.title);
+  }
+
+  if (!prev || !next) return;
+
+  if (calViewMode === 'week' && calSelectedWeekMonday && calendarWeekMondays.length) {
+    const idx = calendarWeekMondays.indexOf(calSelectedWeekMonday);
+    prev.disabled = idx <= 0;
+    next.disabled = idx < 0 || idx >= calendarWeekMondays.length - 1;
+    prev.title = '前の週';
+    next.title = '次の週';
+    prev.setAttribute('aria-label', '前の週');
+    next.setAttribute('aria-label', '次の週');
+    return;
+  }
+
+  const oldest = getCalOldestIso();
+  const iso = curIso;
+  prev.disabled = iso <= oldest;
+  next.disabled = iso >= latest;
+  prev.title = '前の日';
+  next.title = '次の日';
+  prev.setAttribute('aria-label', '前の日');
+  next.setAttribute('aria-label', '次の日');
+}
+
+function shiftTimelineView(delta) {
+  if (calViewMode === 'week' && calSelectedWeekMonday && calendarWeekMondays.length) {
+    const idx = calendarWeekMondays.indexOf(calSelectedWeekMonday);
+    if (idx < 0) return;
+    const ni = idx + delta;
+    if (ni < 0 || ni >= calendarWeekMondays.length) return;
+    calSelectedWeekMonday = calendarWeekMondays[ni];
+    updateWeekPanel(calSelectedWeekMonday);
+    buildCalendarHeat();
+    return;
+  }
+
+  const curIso = calSelectedIso || getCalLatestIso();
+  const d = parseIsoLocal(curIso);
+  d.setDate(d.getDate() + delta);
+  const iso = isoFromDate(d);
+  const oldest = getCalOldestIso();
+  const latest = getCalLatestIso();
+  if (iso < oldest || iso > latest) return;
+
+  calSelectedIso = iso;
+  calViewMode = 'day';
+  calSelectedWeekMonday = isoFromDate(getMonday(d));
+  setWeekPanelVisible(false);
+  setTimelineViewDate(d);
+  updateTimelineStatsForDay(iso);
+  buildCalendarHeat();
+}
+
+const FILTER_SOURCE_TOTAL = 20;
+
+function updateFilterCount() {
+  const el = document.getElementById('filter-count');
+  if (!el) return;
+  const n = document.querySelectorAll('#filter-source-row .ftag.on').length;
+  el.textContent = n === FILTER_SOURCE_TOTAL ? '全20' : `${n}/20`;
+}
+
+function toggleFilter(btn) { btn.classList.toggle('on'); applyFilter(); }
+
+/** タイムラインのバッジ: 1回目はそのソースだけに絞る。既にその1ソースだけのときは解除（全ソース ON） */
+function filterToSingleSourceFromBadge(btn) {
+  const item = btn.closest('.tl-item');
+  if (!item || item.dataset.src === undefined) return;
+  const id = String(item.dataset.src);
+  const onFtags = [...document.querySelectorAll('#filter-source-row .ftag.on')];
+  const onlyThisSource =
+    onFtags.length === 1 && String(onFtags[0].dataset.src) === id;
+  if (onlyThisSource) {
+    filterAll();
+    return;
+  }
+  filterToSingleSource(id);
+}
+
+function filterToSingleSource(src) {
+  const id = String(src);
+  document.querySelectorAll('#filter-source-row .ftag').forEach(b => {
+    b.classList.toggle('on', b.dataset.src === id);
+  });
+  const mediaBtn = document.getElementById('media-filter-btn');
+  if (mediaBtn) mediaBtn.classList.remove('on');
+  applyFilter();
+}
+
+function toggleMediaFilter(btn) {
+  btn.classList.toggle('on');
+  applyFilter();
+}
+
+function filterAll() {
+  document.querySelectorAll('#filter-source-row .ftag').forEach(b => b.classList.add('on'));
+  applyFilter();
+}
+
+function applyFilter() {
+  updateFilterCount();
+  const active = new Set([...document.querySelectorAll('#filter-source-row .ftag.on')].map(b => b.dataset.src));
+  const mediaOnly = document.getElementById('media-filter-btn')?.classList.contains('on');
+  let visible = 0;
+  document.querySelectorAll('#timeline .tl-item').forEach(item => {
+    let show = active.has(item.dataset.src);
+    if (show && mediaOnly) show = item.getAttribute('data-has-media') === 'true';
+    item.classList.toggle('hidden', !show);
+    if (show) visible++;
+  });
+  document.getElementById('no-items').style.display = visible === 0 ? 'block' : 'none';
+}
+
+document.getElementById('filter-toggle').addEventListener('click', function () {
+  const row = document.getElementById('filter-source-row');
+  const arrow = document.getElementById('filter-arrow');
+  const toggleBtn = document.getElementById('filter-toggle');
+  row.classList.toggle('filter-source-row--collapsed');
+  const collapsed = row.classList.contains('filter-source-row--collapsed');
+  arrow.textContent = collapsed ? '▾' : '▴';
+  toggleBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+});
+
+buildCalendarHeat();
+document.getElementById('heat-metric').addEventListener('change', function () {
+  const m = this.value;
+  const card = document.getElementById('cal-card');
+  if (card) {
+    card.dataset.metric = m;
+    card.className = 'card cal-card cal-heat-' + m;
+  }
+  const axis = document.getElementById('heat-legend-axis');
+  if (axis) axis.textContent = m === 'weather' ? '低 → 高' : '少 → 多';
+  buildCalendarHeat();
+});
+const calLatestBtn = document.getElementById('cal-btn-latest');
+if (calLatestBtn) calLatestBtn.addEventListener('click', goCalLatest);
+
+syncViewDateFromCal();
+updateFilterCount();
+
+const timelineNavPrev = document.getElementById('timeline-nav-prev');
+const timelineNavNext = document.getElementById('timeline-nav-next');
+const timelineNavToday = document.getElementById('timeline-nav-today');
+if (timelineNavPrev) timelineNavPrev.addEventListener('click', function () { shiftTimelineView(-1); });
+if (timelineNavNext) timelineNavNext.addEventListener('click', function () { shiftTimelineView(1); });
+if (timelineNavToday) timelineNavToday.addEventListener('click', function () { goCalLatest(); });
+
+/** photo(10)・health(9)・weather(7)・netflix(19)・prime(20) 以外は投稿時刻をソースへのリンクに（モックURL） */
+const TL_TIME_PLAIN_SRC = new Set([7, 9, 10, 19, 20]);
+
+function mockTimelineSourceUrl(src) {
+  const u = {
+    1: 'https://misskey.io/notes/planet-mock',
+    2: 'https://tanoshii.site/notes/planet-mock',
+    3: 'https://mistodon.cloud/@healthcare/123456',
+    4: 'https://www.last.fm/user/objtus',
+    5: 'https://yuinoid.neocities.org/planet-mock',
+    6: 'https://www.youtube.com/watch?v=planet-mock',
+    8: 'https://github.com/yuinoid',
+    11: 'https://misskey.io/notes/planet-mock-vknsq',
+    12: 'https://msk.ilnk.info/notes/planet-mock',
+    13: 'https://sushi.ski/notes/planet-mock',
+    14: 'https://mastodon.cloud/@objtus/123456',
+    15: 'https://pon.icu/notes/planet-mock',
+    16: 'https://groundpolis.app/notes/planet-mock',
+    17: 'https://scrapbox.io/stall/planet-mock',
+    18: 'https://example.com/screentime-mock'
+  };
+  return u[String(src)] || 'https://example.com/planet-timeline-mock';
+}
+
+function enhanceTimelineTimeLinks() {
+  document.querySelectorAll('#timeline .tl-item').forEach(function (item) {
+    const src = item.dataset.src;
+    if (src === undefined || TL_TIME_PLAIN_SRC.has(Number(src))) return;
+    const t = item.querySelector(':scope > .tl-time');
+    if (!t || t.tagName === 'A') return;
+    const a = document.createElement('a');
+    a.className = t.className + ' tl-time--link';
+    a.href = mockTimelineSourceUrl(src);
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.title = 'データソースを開く（モック）';
+    a.textContent = t.textContent;
+    t.replaceWith(a);
+  });
+}
+enhanceTimelineTimeLinks();
+  </script>
+</body>
+</html>

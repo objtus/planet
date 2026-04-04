@@ -12,6 +12,15 @@ OllamaでAIサマリーを生成、Neocitiesの個人サイトに自動公開す
 
 ---
 
+## Neocities 公開の二系統
+
+Neocities 連携は用途が分かれる。
+
+1. **雑記への定期サマリー** — 週次・月次などの AI サマリーを HTML にして個人サイトの**雑記**として載せる（ダッシュボードの公開トグルと連動する想定）。実装は Phase 6 **M4**。詳細は `docs/phase6_plan.md`（M4）と `docs/design.md` §8。
+2. **Planet ページ** — タイムライン表示用。公開用 JSON は Cloudflare Pages（例: `data.idoko.org`）経由で配信し、Neocities 上の `planet/` の HTML が fetch する。手順は `docs/planet_feed_setup.md`、実装は **M5** および `publisher/build_feed.py` 等。
+
+---
+
 ## 技術スタック
 
 | 役割 | 技術 |
@@ -82,7 +91,7 @@ planet/
 │   └── templates/
 ├── mockup/                  # UI デザインモックアップ
 ├── summarizer/              # Ollama サマリー（週・月 CLI → `generate --period week|month`）
-├── publisher/               # Neocities公開スクリプト（未実装）
+├── publisher/               # planet-feed JSON（build_feed）／雑記Neocities（M4）は今後
 ├── backup/                  # バックアップスクリプト（未実装）
 └── docs/                    # ドキュメント群
 ```

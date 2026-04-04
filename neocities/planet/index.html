@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<!-- 本番用: 末尾は /planet/planet-app.js のみ。mockup/neocities_planet_mockup.html（約1500行+インラインJS）は上げないこと -->
+<html lang="ja">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>planet - 100%health</title>
+  <meta name="description" content="100%health の planet ページ。直近のカレンダーとタイムライン（data.idoko.org 連携）。">
+  <meta name="author" content="yuinoid">
+  <meta property="og:url" content="https://yuinoid.neocities.org/planet/index.html">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="100%health">
+  <meta property="og:description" content="100%health の planet ページ。直近のカレンダーとタイムライン（data.idoko.org 連携）。">
+  <meta property="og:locale" content="ja_JP">
+  <meta property="og:title" content="planet - 100%health">
+  <meta property="og:image" content="/img/ogp.gif">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="google-site-verification" content="H_-LY4RFx7v9bkgjTQpjGWcfEjtOkGaq0ie_m_vNe4g">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="apple-touch-icon" type="image/png" href="/apple-touch-icon-180x180.png">
+  <link rel="alternate" type="application/rss+xml" title="100%health RSS Feed" href="/rss.xml">
+  <link rel="stylesheet" href="/1column.css">
+  <script src="/js/jquery-3.6.0.min.js" defer></script>
+  <script src="/js/main.js" defer></script>
+  <script src="/js/mouse.js" defer></script>
+  <style>
+/*
+  box-sizing は #galleryspace 内のみに限定する（全要素に適用すると
+  #back / #address の幅計算が変わり、1column のヘッダー見え方とずれる）
+*/
+#galleryspace,
+#galleryspace *,
+#galleryspace *::before,
+#galleryspace *::after {
+  box-sizing: border-box;
+}
+
+#main h1.title {
+  padding-top: 0;
+  scale: 1 1;
+  margin-bottom: 2rem;
+}
+
+/* ---- section label ---- */
+.section-label {
+  font-size: 0.75em;
+  margin-bottom: 6px;
+  opacity: 0.45;
+  letter-spacing: 0.02em;
+}
+
+/* ========== カレンダー（旧7日サマリー枠） ========== */
+.summary-wrap {
+  margin-bottom: 2rem;
+}
+
+/* ========== DETAIL ========== */
+.detail-wrap {
+  border-top: 1px solid light-dark(#000, #555);
+  padding-top: 1rem;
+}
+
+.detail-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.detail-title {
+  font-size: 1em;
+  font-weight: bold;
+  font-family: "UDEV Gothic HSNFLG", ui-monospace, monospace;
+}
+
+.detail-meta {
+  font-size: 0.75em;
+  opacity: 0.45;
+  font-family: "UDEV Gothic HSNFLG", ui-monospace, monospace;
+}
+
+/* ----- 直近30日ヒートマップ（週行・上=古い週／下=最新週） ----- */
+#galleryspace {
+  --cal-border: light-dark(#ddd, #444);
+}
+
+/* 指標ごとに色味を分ける（凡例・セルとも .cal-card 配下の変数を参照） */
+.cal-card.cal-heat-posts {
+  --heat-0: light-dark(#f0f0f0, #2a2a2a);
+  --heat-1: light-dark(#ebedf0, #3a3a3a);
+  --heat-2: light-dark(#9be9a8, #14532d);
+  --heat-3: light-dark(#40c463, #15803d);
+  --heat-4: light-dark(#30a14e, #22c55e);
+  --heat-5: light-dark(#216e39, #4ade80);
+}
+.cal-card.cal-heat-plays {
+  --heat-0: light-dark(#f5f3ff, #2a2a2a);
+  --heat-1: light-dark(#ede9fe, #3a3a3a);
+  --heat-2: light-dark(#ddd6fe, #4c1d95);
+  --heat-3: light-dark(#a78bfa, #6d28d9);
+  --heat-4: light-dark(#7c3aed, #a78bfa);
+  --heat-5: light-dark(#5b21b6, #c4b5fd);
+}
+.cal-card.cal-heat-steps {
+  --heat-0: light-dark(#fff7ed, #2a2a2a);
+  --heat-1: light-dark(#ffedd5, #3a3a3a);
+  --heat-2: light-dark(#fed7aa, #9a3412);
+  --heat-3: light-dark(#fdba74, #c2410c);
+  --heat-4: light-dark(#fb923c, #ea580c);
+  --heat-5: light-dark(#ea580c, #fdba74);
+}
+/* 気温：原色の黄・橙・赤をやめ、寒色グレー → 暖色グレーのみで段階を表す */
+.cal-card.cal-heat-weather {
+  --heat-0: light-dark(#f0f1f3, #2a2a2a);
+  --heat-1: light-dark(#e8ecf1, #333940);
+  --heat-2: light-dark(#d9e1ea, #3d4752);
+  --heat-3: light-dark(#c5d0dc, #4a5563);
+  --heat-4: light-dark(#dcd6d2, #4a4541);
+  --heat-5: light-dark(#cfc4be, #554a43);
+}
+
+.cal-card {
+  margin-bottom: 0;
+  font-family: "UDEV Gothic HSNFLG", ui-monospace, monospace;
+  font-size: 11px;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* 週が増えても縦スクロール（モックは5週だがレイアウト用） */
+.cal-scroll {
+  max-height: min(22rem, 70vh);
+  overflow-y: auto;
+  overflow-x: auto;
+  border: 1px solid var(--cal-border);
+  border-radius: 4px;
+}
+.cal-scroll .cal-grid {
+  margin: 0;
+}
+
+.cal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.cal-month-line {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.cal-month-title {
+  font-size: 0.95em;
+  font-weight: bold;
+}
+
+.cal-today-btn {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 2px 6px;
+  font: inherit;
+  cursor: pointer;
+  opacity: 0.5;
+  font-size: 11px;
+}
+.cal-today-btn:hover {
+  opacity: 1;
+  background: light-dark(#000, #888);
+  color: light-dark(#fff, #fff);
+}
+
+.cal-grid {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.cal-grid th,
+.cal-grid td {
+  padding: 2px;
+  text-align: center;
+  vertical-align: middle;
+}
+.cal-grid thead th {
+  font-weight: normal;
+  opacity: 0.55;
+  font-size: 10px;
+  padding-bottom: 4px;
+}
+.cal-grid th.wn {
+  width: 2.2em;
+}
+.cal-grid .wn-cell {
+  padding-right: 4px;
+  vertical-align: middle;
+}
+.wn-btn {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 2px 0;
+  font: inherit;
+  font-size: 9px;
+  opacity: 0.55;
+  cursor: pointer;
+  border-radius: 2px;
+  color: inherit;
+}
+.wn-btn:hover {
+  opacity: 1;
+  background: light-dark(#00000014, #ffffff18);
+}
+.wn-btn:focus-visible {
+  outline: 2px solid light-dark(#06c, #8cf);
+  outline-offset: 1px;
+}
+.wn-btn.selected {
+  opacity: 1;
+  font-weight: bold;
+  background: light-dark(#0000001a, #ffffff22);
+}
+
+.cal-grid tbody tr.cal-week-selected {
+  background: light-dark(#00000008, #ffffff0a);
+}
+
+.cal-grid .day {
+  min-height: 1.75em;
+  line-height: 1.4;
+  padding: 3px 2px;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: background 0.1s, box-shadow 0.1s;
+}
+.cal-grid .day.other {
+  opacity: 0.35;
+}
+/* 閲覧範囲外（30日より前／最新日より後） */
+.cal-grid .day.out-of-range {
+  opacity: 0.38;
+  cursor: default;
+  filter: grayscale(0.35);
+}
+.cal-grid .day.out-of-range:hover {
+  background: inherit;
+}
+.cal-grid .day.today {
+  box-shadow: inset 0 0 0 1px light-dark(#000, #888);
+}
+.cal-grid .day.selected {
+  box-shadow: inset 0 0 0 2px light-dark(#00f, #8cf);
+}
+
+.cal-grid .day.h0 { background: var(--heat-0); }
+.cal-grid .day.h1 { background: var(--heat-1); }
+.cal-grid .day.h2 { background: var(--heat-2); color: light-dark(#000, #f5f5f5); }
+.cal-grid .day.h3 { background: var(--heat-3); color: #fff; }
+.cal-grid .day.h4 { background: var(--heat-4); color: #fff; }
+.cal-grid .day.h5 { background: var(--heat-5); color: #fff; }
+
+/* 歩数・気温は中間帯が明るいので文字色を調整 */
+.cal-card.cal-heat-steps .day.h5 {
+  color: light-dark(#431407, #fff7ed);
+}
+.cal-card.cal-heat-weather .day.h1,
+.cal-card.cal-heat-weather .day.h2,
+.cal-card.cal-heat-weather .day.h3,
+.cal-card.cal-heat-weather .day.h4,
+.cal-card.cal-heat-weather .day.h5 {
+  color: light-dark(#1e1e1e, #e8e8e8);
+}
+
+.cal-card .legend {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+  font-size: 10px;
+  opacity: 0.75;
+}
+
+.heat-metric-select {
+  font: inherit;
+  font-size: 11px;
+  padding: 1px 4px;
+  max-width: 10em;
+}
+
+.cal-card .lbox {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.heat-legend-axis {
+  margin-left: 4px;
+  opacity: 0.7;
+}
+
+/* 週サマリー（週番号クリック時） */
+.week-view-panel {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid light-dark(#000, #555);
+  font-family: "UDEV Gothic HSNFLG", ui-monospace, monospace;
+  font-size: 11px;
+}
+.week-view-panel.is-hidden {
+  display: none;
+}
+
+.week-weather-strip {
+  margin-top: 12px;
+  padding: 8px 0 4px;
+  border-top: 1px solid light-dark(#ddd, #444);
+  overflow-x: auto;
+}
+.ww-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+  opacity: 0.65;
+  font-size: 10px;
+}
+.ww-title { font-weight: bold; }
+.ww-row {
+  display: flex;
+  gap: 4px;
+  min-width: min-content;
+}
+.ww-cell {
+  flex: 0 0 auto;
+  width: 4.5rem;
+  padding: 4px 2px;
+  text-align: center;
+  font-size: 9px;
+  border-radius: 4px;
+  background: light-dark(#f8f8f8, #1e1e1e);
+  border: 1px solid light-dark(#e5e5e5, #333);
+}
+.ww-dow { opacity: 0.5; margin-bottom: 2px; }
+.ww-date { opacity: 0.75; margin-bottom: 3px; }
+.ww-icon { font-size: 14px; line-height: 1.2; margin-bottom: 2px; }
+.ww-temp { font-feature-settings: "tnum"; margin-bottom: 2px; }
+.ww-desc {
+  opacity: 0.55;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* stats */
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  margin-bottom: 1.2rem;
+  font-family: "UDEV Gothic HSNFLG", ui-monospace, monospace;
+}
+.stat-card { padding: 6px 8px 6px 0; }
+.stat-label { font-size: 9px; opacity: 0.45; margin-bottom: 2px; }
+.stat-val   { font-size: 1.25em; font-weight: bold; line-height: 1.2; }
+.stat-src   { font-size: 9px; opacity: 0.35; margin-top: 1px; }
+@media (max-width: 520px) {
+  .stat-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* /planet 内アイコン … misskeyio.webp, tanoshiisite.jpg, mistodon-cloud.jpg, cosense.png, last-fm-square-color-icon.svg など */
+.src-icon {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  flex-shrink: 0;
+  image-rendering: auto;
+}
+.stat-src .src-icon {
+  width: 12px;
+  height: 12px;
+  opacity: 0.9;
+}
+
+/* filter */
+.filter-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 0.75em;
+  font-family: "UDEV Gothic HSNFLG", ui-monospace, monospace;
+}
+.filter-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.filter-toggle-btn {
+  font: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 0;
+  color: inherit;
+  opacity: 0.85;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.filter-toggle-btn:hover { opacity: 1; }
+#filter-count { opacity: 0.55; }
+#filter-arrow { display: inline-block; min-width: 1em; }
+.filter-sep {
+  width: 1px;
+  height: 14px;
+  background: light-dark(#ccc, #555);
+  flex-shrink: 0;
+}
+
+.ftag {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 2px;
+  border: none;
+  cursor: pointer;
+  opacity: 0.3;
+  font-size: 11px;
+  line-height: 1.6;
+  transition: opacity 0.1s, background 0.1s, color 0.1s;
+}
+.ftag.on { opacity: 1; }
+.ftag:hover, .ftag.on:hover { background: black; color: white; opacity: 1; }
+.ftag:hover .src-icon[src$=".svg"],
+.ftag.on:hover .src-icon[src$=".svg"] {
+  filter: brightness(0) invert(1);
+}
+
+.filter-source-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  row-gap: 4px;
+  min-width: 0;
+}
+.filter-source-row.filter-source-row--collapsed {
+  display: none !important;
+}
+.ftag img:not(.src-icon) {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+.ftag .ficon {
+  font-size: 1em;
+  line-height: 1;
+}
+
+.filter-all {
+  padding: 0 2px;
+  border: none;
+  font-size: 11px;
+  line-height: 1.6;
+  opacity: 0.4;
+}
+.filter-all:hover { background: black; color: white; opacity: 1; }
+
+/* タイムライン表示日 */
+.timeline-date-bar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid light-dark(#ebebeb, #333);
+  font-family: "UDEV Gothic HSNFLG", ui-monospace, monospace;
+}
+.timeline-date-label {
+  font-size: 0.75em;
+  opacity: 0.45;
+  letter-spacing: 0.02em;
+}
+.timeline-date-nav-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  flex: 1 1 14rem;
+  justify-content: flex-end;
+}
+.timeline-today-btn {
+  appearance: none;
+  border: none;
+  background: none;
+  margin: 0;
+  padding: 1px 5px;
+  color: inherit;
+  font: inherit;
+  font-size: 0.75em;
+  font-weight: bold;
+  line-height: 1.2;
+  cursor: pointer;
+  flex-shrink: 0;
+  opacity: 0.45;
+  border-radius: 0;
+}
+.timeline-today-btn:hover:not(:disabled) {
+  opacity: 1;
+  background: light-dark(#00000012, #ffffff14);
+}
+.timeline-today-btn:focus-visible {
+  outline: 1px dashed light-dark(#666, #999);
+  outline-offset: 2px;
+}
+.timeline-today-btn:disabled {
+  opacity: 0.22;
+  cursor: default;
+}
+.timeline-date-sep {
+  opacity: 0.35;
+  font-weight: normal;
+  user-select: none;
+  flex-shrink: 0;
+  font-size: 0.85em;
+}
+.timeline-date-arrows-inner {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+.timeline-nav-btn {
+  appearance: none;
+  border: none;
+  background: none;
+  margin: 0;
+  padding: 1px 5px;
+  color: inherit;
+  font: inherit;
+  font-size: 0.95em;
+  font-weight: bold;
+  line-height: 1.2;
+  font-feature-settings: "tnum";
+  cursor: pointer;
+  flex-shrink: 0;
+  opacity: 0.42;
+  border-radius: 0;
+}
+.timeline-nav-btn:hover:not(:disabled) {
+  opacity: 1;
+  background: light-dark(#00000012, #ffffff14);
+}
+.timeline-nav-btn:focus-visible {
+  outline: 1px dashed light-dark(#666, #999);
+  outline-offset: 2px;
+}
+.timeline-nav-btn:disabled {
+  opacity: 0.18;
+  cursor: not-allowed;
+}
+.timeline-date-value {
+  font-size: 0.9em;
+  font-weight: bold;
+  font-feature-settings: "tnum";
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: center;
+  line-height: 1.35;
+}
+/* 週タイトルが長いとき：やや小さく折り返し（全文は title で） */
+.timeline-date-value.timeline-date-value--week {
+  font-size: 0.78em;
+  font-weight: bold;
+  text-wrap: balance;
+  hyphens: auto;
+}
+@media (max-width: 480px) {
+  .timeline-date-value.timeline-date-value--week {
+    font-size: 0.72em;
+  }
+}
+
+/* timeline */
+.timeline { display: flex; flex-direction: column; gap: 0; }
+
+.tl-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid light-dark(#ebebeb, #333);
+  font-size: 0.85em;
+}
+.tl-item.hidden { display: none; }
+
+.timeline > .tl-item:first-child,
+.timeline > .tl-run:first-child .tl-item:first-child {
+  border-top: 1px solid light-dark(#ebebeb, #333);
+}
+.tl-run {
+  display: flex;
+  flex-direction: column;
+}
+.tl-run.hidden {
+  display: none;
+}
+.tl-run .tl-item {
+  border-top: none;
+}
+/* 代表1行＋「ほかN件」サマリを視覚的に1ブロックに（二重の border-bottom を解消） */
+.tl-run > .tl-item:first-of-type:has(+ .tl-run-summary-row:not(.hidden)) {
+  border-bottom: none;
+  padding-bottom: 2px;
+}
+.tl-run-summary-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 0 0 6px 0;
+  margin-top: -4px;
+  border-bottom: 1px solid light-dark(#ebebeb, #333);
+  font-size: 0.78em;
+  opacity: 0.55;
+}
+.tl-run-summary-row.hidden {
+  display: none;
+}
+.tl-run-gutter {
+  min-width: 41px;
+  flex-shrink: 0;
+}
+.tl-run-summary-body {
+  flex: 1;
+  min-width: 0;
+}
+button.tl-run-toggle {
+  appearance: none;
+  border: none;
+  background: none;
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  line-height: 1.35;
+}
+button.tl-run-toggle::before {
+  content: '└ ';
+  margin-right: 15px;
+}
+button.tl-run-toggle:hover,
+button.tl-run-toggle:focus-visible {
+  opacity: 0.85;
+}
+button.tl-run-toggle:focus-visible {
+  outline: 1px dotted light-dark(#000, #fff);
+  outline-offset: 2px;
+}
+.tl-run-extras {
+  display: flex;
+  flex-direction: column;
+}
+.tl-run-extras[hidden] {
+  display: none !important;
+}
+
+.tl-time {
+  font-size: 10px;
+  opacity: 0.35;
+  min-width: 34px;
+  padding-top: 0;
+  font-family: "UDEV Gothic HSNFLG", ui-monospace, monospace;
+  font-feature-settings: "tnum";
+  flex-shrink: 0;
+}
+a.tl-time.tl-time--link {
+  color: inherit;
+  text-decoration: none;
+}
+a.tl-time.tl-time--link:hover {
+  opacity: 0.75;
+  color: #fff;
+  text-decoration: underline;
+}
+a.tl-time.tl-time--link::after {
+    background-image: none;
+    transform: translateY(-3px);
+}
+a.tl-time.tl-time--link:hover::after {
+    background-image: url('/external_link-icon1x2.png');
+    transform: translateY(-3px);
+}
+
+.tl-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  line-height: 1.5;
+  opacity: 0.45;
+  font-family: "UDEV Gothic HSNFLG", ui-monospace, monospace;
+  padding-top: 1px;
+}
+.tl-badge .src-icon {
+  width: 12px;
+  height: 12px;
+  opacity: 0.95;
+}
+.tl-badge .ficon {
+  font-size: 11px;
+  line-height: 1.4;
+  padding-left: 4px;
+}
+button.tl-badge {
+  appearance: none;
+  border: none;
+  background: none;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+button.tl-badge:hover,
+button.tl-badge:focus-visible {
+  opacity: 0.9;
+}
+button.tl-badge:focus-visible {
+  outline: 1px dotted light-dark(#000, #fff);
+  outline-offset: 2px;
+}
+
+.tl-content { flex: 1; min-width: 0; padding-top: 2px; }
+.tl-text { line-height: 1.1; }
+.tl-sub  { font-size: 10px; opacity: 0.5; margin-top: 1px; }
+
+.no-items { font-size: 0.85em; opacity: 0.4; padding: 10px 0; display: none; }
+
+.planet-load-error { margin: 1rem 0; padding: 12px; border-radius: 8px;
+  background: light-dark(#fee2e2, #450a0a); color: light-dark(#7f1d1d, #fecaca); font-size: 0.9em; }
+
+@media (max-width: 768px) {
+  #main { width: 90%; margin-top: 40px; }
+}
+  </style>
+</head>
+
+<body>
+  <div id="wrapper">
+    <header id="header">
+      <div id="header-flex">
+        <nav id="back" aria-label="戻るナビゲーション">
+          <a id="backicon" href="/index.html">
+            &lt;
+          </a>
+        </nav>
+        <nav id="address" class="addressbar" aria-label="パンくずナビゲーション">
+          <ol class="breadcrumb">
+            <li><a href="/index.html">100%health</a></li>
+            <li aria-current="page"><a href="/planet/index.html">planet yuinoid</a></li>
+          </ol>
+        </nav>
+      </div>
+    </header>
+    <main id="main">
+      <header id="category-header">
+        <nav aria-label="カテゴリナビゲーション">
+          <ol class="main-category">
+            <li><a href="/aboutme.html">about</a></li>
+            <li><a href="/gallery/gallery_main.html">gallery</a></li>
+            <li><a href="/works/works_main.html">works</a></li>
+            <li><a href="/txt/txt_main.html">txt</a></li>
+            <li><a href="/links/links_main.html">links</a></li>
+          </ol>
+          <ol class="sub-category">
+            <li><a href="/planet/index.html">planet yuinoid</a></li>
+          </ol>
+        </nav>
+      </header>
+      <article id="galleryspace">
+        <div id="planet-load-error" class="planet-load-error" role="alert" hidden></div>
+        <h1 class="title">planet yuinoid</h1>
+
+        <section class="summary-wrap">
+          <div class="section-label">// calendar</div>
+          <div class="card cal-card cal-heat-posts" id="cal-card" data-metric="posts">
+            <div class="cal-header">
+              <div class="cal-month-line">
+                <span class="cal-month-title" id="cal-month-title"></span>
+                <button type="button" class="cal-today-btn" id="cal-btn-latest" title="データの最新日を選択">最新</button>
+              </div>
+            </div>
+            <div class="cal-scroll">
+              <table class="cal-grid" aria-label="直近30日のヒートマップ">
+                <thead>
+                  <tr>
+                    <th class="wn" scope="col"><span class="sr-only">週</span></th>
+                    <th scope="col">月</th>
+                    <th scope="col">火</th>
+                    <th scope="col">水</th>
+                    <th scope="col">木</th>
+                    <th scope="col">金</th>
+                    <th scope="col">土</th>
+                    <th scope="col">日</th>
+                  </tr>
+                </thead>
+                <tbody id="cal-body" aria-busy="true"></tbody>
+              </table>
+            </div>
+            <div class="legend">
+              <label class="heat-metric-label">
+                <span class="sr-only">ヒートマップの指標</span>
+                <select id="heat-metric" class="heat-metric-select" title="ヒートマップの指標">
+                  <option value="posts">投稿数</option>
+                  <option value="plays">再生曲数</option>
+                  <option value="steps">歩数</option>
+                  <option value="weather">最高気温</option>
+                </select>
+              </label>
+              <div class="lbox" style="border:0.5px solid var(--cal-border)"></div>
+              <div class="lbox" style="background:var(--heat-1)"></div>
+              <div class="lbox" style="background:var(--heat-2)"></div>
+              <div class="lbox" style="background:var(--heat-3)"></div>
+              <div class="lbox" style="background:var(--heat-4)"></div>
+              <div class="lbox" style="background:var(--heat-5)"></div>
+              <span id="heat-legend-axis" class="heat-legend-axis">少 → 多</span>
+            </div>
+          </div>
+
+          <div id="week-view-panel" class="week-view-panel" aria-live="polite">
+            <div id="week-weather-strip" class="week-weather-strip">
+              <div class="ww-head">
+                <span class="ww-title">この週の天気</span>
+                <span class="ww-loc">Nagoya</span>
+              </div>
+              <div id="week-weather-row" class="ww-row"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- DETAIL -->
+        <section class="detail-wrap">
+          <div class="detail-header">
+            <span class="detail-title">&gt; timeline</span>
+            <span class="detail-meta" id="detail-meta">// 直近30日</span>
+          </div>
+
+          <div class="stat-row" id="timeline-stat-row">
+            <div class="stat-card" id="stat-posts">
+              <div class="stat-label">投稿数</div>
+              <div class="stat-val">18</div>
+              <div class="stat-src">Misskey 18 / Mastodon 0</div>
+            </div>
+            <div class="stat-card" id="stat-plays">
+              <div class="stat-label">再生曲数</div>
+              <div class="stat-val">35</div>
+              <div class="stat-src">Last.fm</div>
+            </div>
+            <div class="stat-card" id="stat-steps">
+              <div class="stat-label">歩数</div>
+              <div class="stat-val">8</div>
+              <div class="stat-src">Apple Watch</div>
+            </div>
+            <div class="stat-card" id="stat-weather">
+              <div class="stat-label">天気</div>
+              <div class="stat-val">🌧 小雨 18.9°</div>
+              <div class="stat-src">Nagoya</div>
+            </div>
+          </div>
+
+          <div class="filter-bar" id="filter-bar">
+            <div class="filter-header">
+              <button type="button" id="filter-toggle" class="filter-toggle-btn" title="ソースフィルターを展開/折りたたむ" aria-expanded="false" aria-controls="filter-source-row">フィルター <span id="filter-count">全20</span> <span id="filter-arrow">▾</span></button>
+              <button type="button" class="filter-all" onclick="filterAll()">すべて</button>
+              <span class="filter-sep" aria-hidden="true"></span>
+              <button type="button" id="media-filter-btn" class="ftag f-rss" title="画像・動画が添付された投稿のみ表示" onclick="toggleMediaFilter(this)"><span class="ficon">📷</span>メディア</button>
+            </div>
+            <div id="filter-source-row" class="filter-source-row filter-source-row--collapsed">
+
+            </div>
+          </div>
+
+          <div class="timeline-date-bar" id="timeline-date-bar" aria-live="polite">
+            <span class="timeline-date-label">// viewing</span>
+            <div class="timeline-date-nav-wrap">
+              <button type="button" class="timeline-today-btn" id="timeline-nav-today" title="最新日のビューへ">今日</button>
+              <span class="timeline-date-sep" aria-hidden="true">|</span>
+              <div class="timeline-date-arrows-inner">
+                <button type="button" class="timeline-nav-btn" id="timeline-nav-prev" aria-label="前へ" title="前へ">‹</button>
+                <span class="timeline-date-value" id="timeline-view-date" role="status" data-date="" data-view=""></span>
+                <button type="button" class="timeline-nav-btn" id="timeline-nav-next" aria-label="次へ" title="次へ">›</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="timeline" id="timeline">
+          
+          </div>
+          <div class="no-items" id="no-items">// no items</div>
+        </section>
+      </article>
+    </main>
+    <footer id="main-footer">
+      <!-- main.jsから#footerへfooter.htmlの挿入 -->
+      <div id="footerhtml"></div>
+    </footer>
+  </div>
+
+  <script src="/planet/planet-app.js" defer></script>
+</body>
+</html>

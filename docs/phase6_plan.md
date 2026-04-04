@@ -168,6 +168,8 @@
 
 ### M4 — Neocities: 週次（＋方針次第で月次）HTML
 
+個人サイトの**雑記**欄へ、読み物としてのサマリーを定期アップロードするルート（Planet ページ用の JSON・`planet_feed` 連携とは別。M5 と混同しないこと）。
+
 - `publisher/templates/summary.html`（または週専用）で静的 HTML を生成。  
 - `publisher/neocities.py`: `POST https://neocities.org/api/upload`（`docs/api/neocities.md` のパス規則と一致）。  
 - **アップロード対象**: `is_published=TRUE` の行のみ（ダッシュボードのトグルと連動）。  

@@ -46,6 +46,29 @@ lookback_days = 30
 [neocities]
 api_key = "YOUR_NEOCITIES_API_KEY"
 
+# planet-feed（Cloudflare Pages 用 JSON を git push）
+# repo_path 未指定時は ~/planet-feed
+# push = false のときは commit のみ（または --push で上書き）
+[planet_feed]
+# repo_path は必ずこのマシン上の実パス（例の /home/you/... のままにしない）
+# repo_path = "/home/objtus/planet-feed"
+# push = true
+#
+# タイムライン連続折りたたみ（必ずこの [planet_feed] 直下。source_display 内に書かないこと）
+# timeline_collapse_types = ["lastfm"]
+# timeline_collapse_min_run = 3
+#
+# Neocities 用 sources[] 上書き（キーは DB の source id）
+#
+# [planet_feed.source_display.7]
+# icon_emoji = "🌤️"
+#
+# [planet_feed.source_display.4]
+# icon_file = "lastfm.svg"
+#
+# [planet_feed.source_display.8]
+# icon_url = "https://github.githubassets.com/favicons/favicon.svg"
+
 # Ollama: 使うモデルは事前に `ollama pull <model>` が必要。利用可能は `ollama list`。
 [ollama]
 base_url = "http://localhost:11434"

@@ -26,6 +26,7 @@ planet/
 ├── summarizer/          # AI summary generation (Ollama)
 │   ├── generate.py      # Main CLI entry point (~848 lines)
 │   └── prompts/         # Markdown prompt templates with {{PLACEHOLDER}} syntax
+├── publisher/           # planet-feed JSON (`python -m publisher.build_feed`) — Neocities summary HTML (M4) TBD
 ├── dashboard/           # Flask web UI
 │   ├── app.py           # Core Flask application (~1,167 lines)
 │   ├── static/          # CSS, JS, bundled libraries (Chart.js, marked, DOMPurify)
@@ -80,6 +81,7 @@ Sections:
 - `[github]` — PAT token & username
 - `[youtube]` — API key & channel ID
 - `[neocities]` — API key
+- `[planet_feed]` — optional `repo_path`, `push` for `publisher.build_feed` (see `docs/planet_feed_setup.md`)
 - Per-source Misskey/Mastodon tokens
 
 Load config with `tomllib` (Python 3.11+ stdlib):
@@ -151,6 +153,10 @@ python -m summarizer.generate --period week --date 2025-W52 --dry-run
 python -m summarizer.generate --period week --date 2025-W52
 python -m summarizer.generate --period month --date 2025-12
 python -m summarizer.generate --period day --date 2025-12-31
+
+# Planet feed JSON → ~/planet-feed (see docs/planet_feed_setup.md)
+python -m publisher.build_feed --dry-run
+python -m publisher.build_feed --no-push
 ```
 
 ### Service management (production)
