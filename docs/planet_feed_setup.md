@@ -186,11 +186,11 @@ yuinoid.neocities.org/planet/index.html + planet-app.js + planet/icons/*
 
 ## cron（`cron/crontab.txt`）
 
-リポジトリの [cron/crontab.txt](cron/crontab.txt) に `PUBLISHER_LOG` と毎日 7:00（**サーバのローカル時**）の行を追加済み。実際の crontab へ反映するには `crontab -e` で該当行をマージするか、`crontab /home/objtus/planet/cron/crontab.txt` で全体を上書き（他ジョブと重複に注意）。
+リポジトリの [cron/crontab.txt](cron/crontab.txt) に `PUBLISHER_LOG` と **1 日 3 回（7 / 15 / 23 時・サーバのローカル時）**の `build_feed` 行を追加済み。実際の crontab へ反映するには `crontab -e` で該当行をマージするか、`crontab /home/objtus/planet/cron/crontab.txt` で全体を上書き（他ジョブと重複に注意）。
 
 ```cron
 PUBLISHER_LOG=/home/objtus/planet/cron/publisher.log
-0 7 * * * cd $PLANET && $PYTHON -m publisher.build_feed >> $PUBLISHER_LOG 2>&1
+0 7,15,23 * * * cd $PLANET && $PYTHON -m publisher.build_feed >> $PUBLISHER_LOG 2>&1
 ```
 
 ---

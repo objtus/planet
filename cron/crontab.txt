@@ -22,8 +22,8 @@ PUBLISHER_LOG=/home/objtus/planet/cron/publisher.log
 20 6 * * * cd $PLANET && $PYTHON -m collectors.scrapbox >> $LOG 2>&1
 
 # Planet feed（planet-data.json / planet-meta.json → ~/planet-feed へ push）
-# サーバのタイムゾーンが JST なら 7:00 が朝7時。UTC の場合は JST 7:00 に合わせて hour を調整すること。
-0 7 * * * cd $PLANET && $PYTHON -m publisher.build_feed >> $PUBLISHER_LOG 2>&1
+# JST 想定: 8時間おきに 3 回（7 / 15 / 23 時）。UTC 運用なら JST に合わせて hour をずらすこと。
+0 7,15,23 * * * cd $PLANET && $PYTHON -m publisher.build_feed >> $PUBLISHER_LOG 2>&1
 
 # NOTE: ingest API (Phase 4) は systemd で管理 → planet-ingest.service
 # Phase 5 ダッシュボード実装後は dashboard/app.py に統合し、cron からは削除
