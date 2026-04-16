@@ -691,6 +691,32 @@ button.tl-run-toggle:focus-visible {
   display: none !important;
 }
 
+.tl-vis-semi {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+  opacity: 0.45;
+  color: inherit;
+}
+/* タイムライン行の右端（本文エリアの後） */
+.tl-vis-semi.tl-vis-semi--end {
+  align-self: flex-start;
+  margin-top: 2px;
+  margin-left: auto;
+}
+.tl-vis-semi__svg {
+  display: block;
+}
+.tl-vis-semi__img {
+  display: block;
+  width: 12px;
+  height: 12px;
+  object-fit: contain;
+  vertical-align: top;
+}
+
 .tl-time {
   font-size: 10px;
   opacity: 0.35;
@@ -760,7 +786,36 @@ button.tl-badge:focus-visible {
 }
 
 .tl-content { flex: 1; min-width: 0; padding-top: 2px; }
-.tl-text { line-height: 1.1; }
+.tl-text {
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+.tl-media-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 6px;
+  a:after { content: none; }
+  a:hover { background-color: transparent; }
+}
+.tl-media-row a.planet-tl-lb {
+  display: block;
+  line-height: 0;
+  border-radius: 4px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.tl-media-row .tl-media-thumb {
+  display: block;
+  max-height: 140px;
+  max-width: min(100%, 280px);
+  width: auto;
+  height: auto;
+  object-fit: cover;
+  image-rendering: auto;
+  vertical-align: middle;
+}
 .tl-sub  { font-size: 10px; opacity: 0.5; margin-top: 1px; }
 
 .no-items { font-size: 0.85em; opacity: 0.4; padding: 10px 0; display: none; }
@@ -933,6 +988,11 @@ button.tl-badge:focus-visible {
       <!-- main.jsから#footerへfooter.htmlの挿入 -->
       <div id="footerhtml"></div>
     </footer>
+  </div>
+  <div id="lightbox">
+    <link rel="stylesheet" href="/luminous-basic.min.css" />
+    <script src="/Luminous.min.js"></script>
+    <!-- タイムラインは planet-app.js が描画後に #timeline a.planet-tl-lb へ LuminousGallery を付与 -->
   </div>
 
   <script src="/planet/planet-app.js" defer></script>

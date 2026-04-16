@@ -71,7 +71,7 @@ Neocities 連携は用途が分かれる。
 - ソース管理: 表示順・略称・個別/一括の手動収集（`POST /api/collect/<stype>`）
 - ソースフィルター（アカウント単位でオン/オフ）
 - CSS変数ベース（ライトテーマ・ダークモード自動切替）
-- `ingest/api.py` を統合済み（iPhone ショートカットからも引き続き利用可能）
+- `ingest/api.py` を `dashboard` に Blueprint 統合済み（iPhone ショートカットは `POST /api/ingest`。ヘルス分割 `health_segment`・手動過去投入 `archive`・写真枚数と `logs` の整合は `docs/iphone_shortcuts.md` 参照）
 
 ---
 

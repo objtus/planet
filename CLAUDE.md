@@ -241,8 +241,7 @@ Each collector lives in `collectors/<source>.py` and follows a consistent patter
 | POST | `/api/import/streaming-csv` | Netflix / Prime viewing history CSV (`multipart`: `file`, optional `netflix_profile`). Sources page drag-and-drop |
 | POST | `/api/logs/<id>/soft-delete` | Soft-delete one Last.fm log (`is_deleted`; Last.fm only). Used from calendar and search timelines |
 | PATCH | `/api/summaries/<id>/publish` | Toggle publication status |
-| POST | `/ingest/health` | Receive iPhone health data |
-| POST | `/ingest/photos` | Receive iPhone photo metadata |
+| POST | `/api/ingest` | iPhone ショートカット統合（JSON `source`: `health` / `photo` / `screen_time`）。ヘルスは任意 `health_segment`、`archive`（手動過去投入のタイムライン日付固定）。詳細 `docs/iphone_shortcuts.md` |
 
 ---
 

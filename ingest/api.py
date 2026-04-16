@@ -55,9 +55,67 @@ def get_db_conn(config):
     )
 
 
+def _archive_timeline_anchor_requested(data: dict) -> bool:
+    """手動バックフィル: タイムライン上は date の JST 夜に載せる（オートメーション想定時刻）。"""
+    v = data.get("archive")
+    if v is None:
+        return False
+    if isinstance(v, bool):
+        return v
+    if isinstance(v, (int, float)):
+        return v != 0
+    s = str(v).strip().lower()
+    return s in ("1", "true", "yes", "on", "y")
+
+
+def _health_log_timestamp_jst_anchor(date_str: str, segment: str | None) -> datetime:
+    """date（YYYY-MM-DD）の JST 固定時刻。分割時は movement→23:49, それ以外→23:50。"""
+    d = datetime.strptime(date_str, "%Y-%m-%d").date()
+    if segment == "movement":
+        h, m = 23, 49
+    else:
+        h, m = 23, 50
+    local = datetime(d.year, d.month, d.day, h, m, 0, tzinfo=JST)
+    return local.astimezone(timezone.utc)
+
+
+def _health_log_content(
+    steps,
+    active_calories,
+    heart_rate_avg,
+    exercise_minutes,
+    stand_hours,
+) -> str:
+    """送信された指標だけを並べたタイムライン用本文（心拍は平均・安静時のみ表記）。"""
+    parts = []
+    if steps is not None:
+        parts.append(f"歩数: {steps:,}歩")
+    if active_calories is not None:
+        parts.append(f"消費カロリー: {active_calories}kcal")
+    if heart_rate_avg is not None:
+        parts.append(f"心拍数: {heart_rate_avg}bpm")
+    if exercise_minutes is not None:
+        parts.append(f"運動: {exercise_minutes}分")
+    if stand_hours is not None:
+        parts.append(f"スタンド: {stand_hours}時間")
+    return " / ".join(parts)
+
+
 def _upsert_health(cur, data: dict) -> dict:
     """ヘルスデータを logs と health_daily にupsert"""
-    date_str = data["date"]
+    date_str = _normalize_calendar_date_jst(data["date"])
+
+    raw_seg = data.get("health_segment")
+    if raw_seg is not None and str(raw_seg).strip() != "":
+        segment = str(raw_seg).strip()
+        if segment not in ("movement", "activity"):
+            raise ValueError(
+                "health_segment は 'movement' または 'activity' である必要があります"
+            )
+        original_id = f"{date_str}#{segment}"
+    else:
+        segment = None
+        original_id = date_str
 
     def _int(v):
         return round(v) if v is not None else None
@@ -70,19 +128,29 @@ def _upsert_health(cur, data: dict) -> dict:
     exercise_minutes = _int(data.get("exercise_minutes"))
     stand_hours      = _int(data.get("stand_hours"))
 
-    # logs.content 生成
-    parts = []
-    if steps           is not None: parts.append(f"歩数: {steps:,}歩")
-    if active_calories is not None: parts.append(f"消費カロリー: {active_calories}kcal")
-    if heart_rate_avg  is not None: parts.append(f"心拍数: {heart_rate_avg}bpm")
-    if exercise_minutes is not None: parts.append(f"運動: {exercise_minutes}分")
-    if stand_hours     is not None: parts.append(f"スタンド: {stand_hours}時間")
-    content = " / ".join(parts)
+    content = _health_log_content(
+        steps,
+        active_calories,
+        heart_rate_avg,
+        exercise_minutes,
+        stand_hours,
+    )
+    if not content:
+        raise ValueError("ヘルス指標が1つもありません（いずれかの数値キーを送ってください）")
 
-    # timestamp: 実際の受信時刻（UTC）を使用
-    ts = datetime.now(timezone.utc)
+    archive_anchor = _archive_timeline_anchor_requested(data)
+    if archive_anchor:
+        ts = _health_log_timestamp_jst_anchor(date_str, segment)
+    else:
+        ts = datetime.now(timezone.utc)
 
-    # logs upsert (同じ日付のエントリがあれば上書き)
+    meta = {"type": "health", "date": date_str}
+    if segment:
+        meta["health_segment"] = segment
+    if archive_anchor:
+        meta["archive_timeline"] = True
+
+    # logs upsert（分割時は original_id が日付ごとに2行）
     cur.execute(
         """INSERT INTO logs (source_id, original_id, content, url, timestamp, metadata)
            VALUES (%s, %s, %s, NULL, %s, %s)
@@ -92,8 +160,8 @@ def _upsert_health(cur, data: dict) -> dict:
                  timestamp = EXCLUDED.timestamp
            RETURNING id""",
         (
-            HEALTH_SOURCE_ID, date_str, content, ts,
-            json.dumps({"type": "health", "date": date_str}),
+            HEALTH_SOURCE_ID, original_id, content, ts,
+            json.dumps(meta),
         ),
     )
     log_id = cur.fetchone()[0]
@@ -121,7 +189,15 @@ def _upsert_health(cur, data: dict) -> dict:
         ),
     )
 
-    return {"date": date_str, "log_id": log_id}
+    out = {
+        "date": date_str,
+        "log_id": log_id,
+        "original_id": original_id,
+        "archive_timeline": archive_anchor,
+    }
+    if segment:
+        out["health_segment"] = segment
+    return out
 
 
 def _upsert_photos(cur, data: dict) -> dict:
@@ -160,16 +236,24 @@ def _upsert_photos(cur, data: dict) -> dict:
             except (ValueError, TypeError):
                 pass
 
+        # 枚数は photos_json の要素数を優先（ショートカットの count は 0 ダミー可）
+        actual_count = len(photo_locations) if photo_locations is not None else count
+
         cur.execute(
             """INSERT INTO logs (source_id, original_id, content, url, timestamp, metadata)
                VALUES (%s, %s, %s, NULL, %s, %s)
                ON CONFLICT (source_id, original_id) DO UPDATE
                  SET content = EXCLUDED.content, metadata = EXCLUDED.metadata""",
-            (PHOTO_SOURCE_ID, date_str, f"写真 {count}枚", ts,
-             json.dumps({"type": "photo", "date": date_str, "count": count})),
+            (
+                PHOTO_SOURCE_ID,
+                date_str,
+                f"写真 {actual_count}枚",
+                ts,
+                json.dumps(
+                    {"type": "photo", "date": date_str, "count": actual_count}
+                ),
+            ),
         )
-        # 枚数は photos_json の要素数で上書き可能
-        actual_count = len(photo_locations) if photo_locations is not None else count
 
         cur.execute(
             """INSERT INTO health_daily (date, photo_count, photo_locations)
@@ -336,7 +420,10 @@ def ingest():
         if source == "health":
             if "date" not in data:
                 return jsonify({"error": "date is required for health source", "received_keys": list(data.keys()), "received_data": data}), 400
-            result = _upsert_health(cur, data)
+            try:
+                result = _upsert_health(cur, data)
+            except ValueError as e:
+                return jsonify({"error": str(e)}), 400
         elif source == "screen_time":
             if "date" not in data:
                 return jsonify(

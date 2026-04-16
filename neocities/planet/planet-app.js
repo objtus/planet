@@ -11,6 +11,11 @@ const ICON_BASE = '/planet/icons/';
 /** meta の favicon は拡張子付き。JSON が .webp でも Neocities に .svg だけある場合に順に試す */
 const ICON_EXT_FALLBACKS = ['.svg', '.webp', '.png'];
 
+/** 空文字: 簡素な家形インライン SVG。例: '/planet/icons/visibility-semi-public.png' でビットマップ可 */
+const SEMI_VISIBILITY_ICON_URL = '';
+const SEMI_VISIBILITY_TITLE =
+  '公開タイムラインには出ない半公開（Misskey ホーム相当・Mastodon 未収載）';
+
 const DAYS_JA = ['日', '月', '火', '水', '木', '金', '土'];
 
 /** 時刻をソース URL へリンクしない src_type（ログ行の url があっても本文リンクにしない） */
@@ -784,6 +789,106 @@ function formatHm(t) {
   return s.length >= 5 ? s.slice(0, 5) : s;
 }
 
+function isSemiPublicVisibility(v) {
+  return v === 'home' || v === 'unlisted';
+}
+
+/** Luminous 用: 画像 URL っぽいものだけ（動画・gifv は除外） */
+function mediaItemIsImageForLightbox(m) {
+  if (!m || typeof m !== 'object') return false;
+  const t = String(m.type || '').toLowerCase();
+  if (t.startsWith('video/') || t === 'gifv') return false;
+  if (t.startsWith('image/')) return true;
+  const path = String(m.url || m.thumb || '')
+    .split('?')[0]
+    .toLowerCase();
+  return /\.(jpe?g|png|gif|webp|bmp|avif|svg)$/.test(path);
+}
+
+function appendTimelineMediaThumbs(content, entry) {
+  const list = entry.media;
+  if (!Array.isArray(list) || list.length === 0) return;
+  const row = document.createElement('div');
+  row.className = 'tl-media-row';
+  for (const m of list) {
+    if (!mediaItemIsImageForLightbox(m)) continue;
+    const href = m.url;
+    const src = m.thumb || m.url;
+    if (!href || !src) continue;
+    const a = document.createElement('a');
+    a.className = 'planet-tl-lb';
+    a.href = href;
+    const img = document.createElement('img');
+    img.src = src;
+    img.alt = '';
+    img.loading = 'lazy';
+    img.decoding = 'async';
+    img.className = 'tl-media-thumb';
+    a.appendChild(img);
+    row.appendChild(a);
+  }
+  if (row.childElementCount > 0) content.appendChild(row);
+}
+
+/** タイムライン再描画のたびに Luminous を付け直す（動的 DOM 用） */
+function initTimelineLightbox() {
+  if (typeof LuminousGallery === 'undefined') return;
+  const nodes = document.querySelectorAll('#timeline a.planet-tl-lb');
+  if (nodes.length === 0) return;
+  try {
+    new LuminousGallery(nodes);
+  } catch (err) {
+    console.warn('LuminousGallery init failed', err);
+  }
+}
+
+/** 半公開（home / unlisted）用の目印。SEMI_VISIBILITY_ICON_URL があれば img、なければ SVG */
+function createSemiVisibilityMark() {
+  const wrap = document.createElement('span');
+  wrap.className = 'tl-vis-semi';
+  wrap.title = SEMI_VISIBILITY_TITLE;
+  wrap.setAttribute('aria-label', SEMI_VISIBILITY_TITLE);
+  if (SEMI_VISIBILITY_ICON_URL) {
+    const img = document.createElement('img');
+    img.className = 'tl-vis-semi__img';
+    img.src = SEMI_VISIBILITY_ICON_URL;
+    img.alt = '';
+    img.width = 12;
+    img.height = 12;
+    img.decoding = 'async';
+    wrap.appendChild(img);
+  } else {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', 'tl-vis-semi__svg');
+    svg.setAttribute('viewBox', '0 0 16 16');
+    svg.setAttribute('width', '12');
+    svg.setAttribute('height', '12');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('focusable', 'false');
+    const p1 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    p1.setAttribute(
+      'd',
+      'M2 14V7.5L8 2l6 5.5V14H2z'
+    );
+    p1.setAttribute('fill', 'none');
+    p1.setAttribute('stroke', 'currentColor');
+    p1.setAttribute('stroke-width', '1.25');
+    p1.setAttribute('stroke-linecap', 'round');
+    p1.setAttribute('stroke-linejoin', 'round');
+    const p2 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    p2.setAttribute('d', 'M6 14V10h4v4');
+    p2.setAttribute('fill', 'none');
+    p2.setAttribute('stroke', 'currentColor');
+    p2.setAttribute('stroke-width', '1.25');
+    p2.setAttribute('stroke-linecap', 'round');
+    p2.setAttribute('stroke-linejoin', 'round');
+    svg.appendChild(p1);
+    svg.appendChild(p2);
+    wrap.appendChild(svg);
+  }
+  return wrap;
+}
+
 /** 畳んだブロックの時刻範囲（同日は HH:mm–HH:mm、跨ぎは M/D HH:mm–M/D HH:mm） */
 function formatCollapseTimeRange(oldest, newest) {
   const od = oldest.date;
@@ -872,9 +977,15 @@ function createTlItem(e, srcMap) {
   text.className = 'tl-text';
   text.textContent = e.text || '';
   content.appendChild(text);
+  appendTimelineMediaThumbs(content, e);
   div.appendChild(timeEl);
   div.appendChild(badge);
   div.appendChild(content);
+  if (isSemiPublicVisibility(e.visibility)) {
+    const vis = createSemiVisibilityMark();
+    vis.classList.add('tl-vis-semi--end');
+    div.appendChild(vis);
+  }
   return div;
 }
 
@@ -956,6 +1067,7 @@ function renderTimeline() {
     }
   }
   applyFilter();
+  initTimelineLightbox();
 }
 
 async function loadPlanetData() {

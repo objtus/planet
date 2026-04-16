@@ -1,5 +1,7 @@
 # Planet 自動収集 cron設定
 # crontab -e で追加するか、crontab /home/objtus/planet/cron/crontab.txt で適用
+# 時刻はすべてシステムのローカル TZ。Planet 想定は Asia/Tokyo（JST）:
+#   sudo timedatectl set-timezone Asia/Tokyo && timedatectl
 
 PLANET=/home/objtus/planet
 PYTHON=/home/objtus/planet/venv/bin/python
@@ -22,7 +24,7 @@ PUBLISHER_LOG=/home/objtus/planet/cron/publisher.log
 20 6 * * * cd $PLANET && $PYTHON -m collectors.scrapbox >> $LOG 2>&1
 
 # Planet feed（planet-data.json / planet-meta.json → ~/planet-feed へ push）
-# JST 想定: 8時間おきに 3 回（7 / 15 / 23 時）。UTC 運用なら JST に合わせて hour をずらすこと。
+# 1 日 3 回（7 / 15 / 23 時・ローカル＝ファイル先頭の Asia/Tokyo 想定）。
 0 7,15,23 * * * cd $PLANET && $PYTHON -m publisher.build_feed >> $PUBLISHER_LOG 2>&1
 
 # NOTE: ingest API (Phase 4) は systemd で管理 → planet-ingest.service

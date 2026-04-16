@@ -86,7 +86,9 @@ yuinoid.neocities.org/planet/index.html + planet-app.js + planet/icons/*
 
 - **リポジトリパス**: 既定 `~/planet-feed`。`config/settings.toml` の `[planet_feed] repo_path` で上書き可。**`settings.toml.example` の `/home/you/...` はプレースホルダ**のままにすると、cron 実行時に `/home/you` への作成で `PermissionError` になり得ます（必ず実在するクローン先を書く）。
 - **push**: 既定は有効。`[planet_feed] push = false` で commit のみ（または `./venv/bin/python -m publisher.build_feed --push` で強制 push）。
-- **公開タイムライン**: Misskey / Mastodon は DB 上 `visibility = 'public'` の行のみ（非公開投稿は含めない）。`days` の `posts` 集計はダッシュボードのヒートマップ「投稿」と同じ型（`misskey` / `mastodon` / `rss` / `youtube`）で、タイムライン（GitHub・Scrapbox 等を含む）の件数とは一致しない場合がある。
+- **Fediverse 可視性**: planet-feed では Misskey を **`public` / `home`**、Mastodon を **`public` / `unlisted`** のみ含める（`followers` / `direct` / `specified` 等は除外）。`timeline` の各要素は **`visibility` キーは半公開（`home` / `unlisted`）の行にだけ付与**し、公開は省略する。
+- **ヒートマップとの差**: ダッシュボード `/api/heatmap` の「投稿」は Misskey/Mastodon を **visibility 無差別**で数える。planet-feed の `days.posts` は Fediverse 部分が上記で絞られるため、**ダッシュボードの数値と一致しない**ことがある。
+- **`days.posts`**: `misskey` / `mastodon` / `rss` / `youtube` を含む。タイムライン（GitHub・Scrapbox 等）の件数とは元より一致しない場合がある。
 - **sources**: カレンダーと同様、**全 `data_sources` 行**（非アクティブ含む）を出力。
 
 設定例は `config/settings.toml.example` の `[planet_feed]` を参照。アイコン・絵文字の直接指定は **`[planet_feed.source_display.<id>]`**、タイムライン連続折りたたみは **`timeline_collapse_types`** / **`timeline_collapse_min_run`**。
@@ -176,17 +178,35 @@ yuinoid.neocities.org/planet/index.html + planet-app.js + planet/icons/*
       "text": "らくがきしたい",
       "url": "https://tanoshii.site/notes/abc123",
       "is_boost": false,
-      "has_media": false
+      "has_media": false,
+      "visibility": "home"
     }
   ]
 }
 ```
 
+- `visibility`: **任意**。Misskey/Mastodon で **`home` または `unlisted` のときだけ**付く（公開投稿にはキーなし）。Neocities クライアントが半公開マーク表示に利用。
+
 ---
 
 ## cron（`cron/crontab.txt`）
 
-リポジトリの [cron/crontab.txt](cron/crontab.txt) に `PUBLISHER_LOG` と **1 日 3 回（7 / 15 / 23 時・サーバのローカル時）**の `build_feed` 行を追加済み。実際の crontab へ反映するには `crontab -e` で該当行をマージするか、`crontab /home/objtus/planet/cron/crontab.txt` で全体を上書き（他ジョブと重複に注意）。
+### サーバのタイムゾーン（JST 推奨）
+
+[cron/crontab.txt](cron/crontab.txt) の「時」は **OS のローカルタイムゾーン**に従う。`Etc/UTC` のままだと、コメントの「朝 6 時」「7 / 15 / 23 時」は **UTC の時刻**として解釈され、JST とずれる。
+
+**ローカルを JST にする（Ubuntu / systemd）:**
+
+```bash
+sudo timedatectl set-timezone Asia/Tokyo
+timedatectl   # Time zone: Asia/Tokyo (JST, +0900) になることを確認
+```
+
+変更後は **cron 行の数字はそのままで、発火が日本時間基準になる**（毎時収集・日次 6 時・`build_feed` の 7/15/23 が意図どおり揃う）。
+
+### `build_feed` の登録
+
+リポジトリに `PUBLISHER_LOG` と **1 日 3 回（7 / 15 / 23 時・上記 JST ローカル想定）**の `build_feed` 行を追加済み。実際の crontab へ反映するには `crontab -e` で該当行をマージするか、`crontab /home/objtus/planet/cron/crontab.txt` で全体を上書き（他ジョブと重複に注意）。
 
 ```cron
 PUBLISHER_LOG=/home/objtus/planet/cron/publisher.log
@@ -201,6 +221,7 @@ PUBLISHER_LOG=/home/objtus/planet/cron/publisher.log
 
 - **`file://` で HTML を開いただけでは fetch できない**（null オリジン・CORS）。検証は Neocities 上、またはローカル HTTP サーバでページを配信して行う。
 - アイコンは **`/planet/icons/`** に `planet-meta.json` の `sources[].favicon` と同名ファイルを配置（未配置時は JS が絵文字にフォールバック）。
+- 半公開マーク: `planet-app.js` の **`SEMI_VISIBILITY_ICON_URL`** が空なら簡素なインライン SVG。`/planet/icons/...` などの **相対 URL を指定すると `<img>` で表示**（PNG/WebP/SVG ファイル可）。
 
 ---
 

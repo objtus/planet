@@ -12,12 +12,12 @@ from publisher.display_utils import source_row_to_feed_meta, weather_emoji
 
 JST = ZoneInfo("Asia/Tokyo")
 
-# Fediverse は公開投稿のみ（planet-feed は public リポジトリ経由で配信）
-FEDI_PUBLIC_CLAUSE = """
+# Fediverse: 公開＋半公開のみ（planet-feed は public リポジトリ経由で配信）
+FEDI_FEED_VISIBILITY_CLAUSE = """
   AND (
     ds.type NOT IN ('misskey', 'mastodon')
-    OR (ds.type = 'misskey' AND mp.visibility = 'public')
-    OR (ds.type = 'mastodon' AND mpost.visibility = 'public')
+    OR (ds.type = 'misskey' AND mp.visibility IN ('public', 'home'))
+    OR (ds.type = 'mastodon' AND mpost.visibility IN ('public', 'unlisted'))
   )
 """
 
@@ -59,7 +59,8 @@ def fetch_timeline(
                (l.timestamp AT TIME ZONE 'Asia/Tokyo') AS ts,
                l.metadata,
                ds.type,
-               COALESCE(mp.has_files, FALSE) AS msk_has_files
+               COALESCE(mp.has_files, FALSE) AS msk_has_files,
+               COALESCE(mp.visibility, mpost.visibility, l.metadata->>'visibility') AS fedi_visibility
           FROM logs l
           JOIN data_sources ds ON ds.id = l.source_id
           LEFT JOIN misskey_posts mp ON mp.log_id = l.id
@@ -67,7 +68,7 @@ def fetch_timeline(
          WHERE l.is_deleted = FALSE
            AND l.timestamp >= %s AND l.timestamp < %s
         """
-        + FEDI_PUBLIC_CLAUSE
+        + FEDI_FEED_VISIBILITY_CLAUSE
         + """
          ORDER BY l.timestamp DESC
         """,
@@ -80,6 +81,7 @@ def fetch_timeline(
         ts = r[3]
         stype = r[5]
         msk_has_files = r[6]
+        fedi_vis = r[7]
         is_boost = bool(
             meta.get("renote_id")
             or meta.get("reblog_id")
@@ -98,6 +100,26 @@ def fetch_timeline(
         }
         if r[2]:
             entry["url"] = r[2]
+        if stype in ("misskey", "mastodon") and fedi_vis in ("home", "unlisted"):
+            entry["visibility"] = fedi_vis
+        if media:
+            media_out: list[dict[str, str]] = []
+            for m in media:
+                if not isinstance(m, dict):
+                    continue
+                u = m.get("url")
+                if not u:
+                    continue
+                thumb = m.get("thumb") or m.get("thumbnailUrl") or u
+                media_out.append(
+                    {
+                        "url": u,
+                        "thumb": thumb,
+                        "type": str(m.get("type") or ""),
+                    }
+                )
+            if media_out:
+                entry["media"] = media_out
         out.append(entry)
     return out
 
@@ -117,7 +139,7 @@ def fetch_posts_by_jst_date(
     ts_start: datetime,
     ts_end: datetime,
 ) -> dict[str, int]:
-    """[/api/heatmap posts] と同じ型 + Fediverse public フィルタ。"""
+    """日別投稿数。RSS/YouTube を含む + Fediverse は公開・半公開のみ。"""
     sql = """
         SELECT DATE(l.timestamp AT TIME ZONE 'Asia/Tokyo') AS d, COUNT(*)::bigint
           FROM logs l
@@ -127,7 +149,7 @@ def fetch_posts_by_jst_date(
          WHERE l.is_deleted = FALSE
            AND l.timestamp >= %s AND l.timestamp < %s
            AND ds.type IN ('misskey', 'mastodon', 'rss', 'youtube')
-    """ + FEDI_PUBLIC_CLAUSE + """
+    """ + FEDI_FEED_VISIBILITY_CLAUSE + """
          GROUP BY 1
     """
     return _counts_by_jst_date(cur, ts_start, ts_end, sql)

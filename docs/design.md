@@ -469,39 +469,23 @@ CREATE TABLE summaries (
 
 ## 9. iPhoneショートカット仕様
 
+詳細・手順・curl 例は **`docs/iphone_shortcuts.md`** を正とする（以下は概要）。
+
 ### エンドポイント
-`POST http://<tailscale-ip>:5000/api/ingest`
+`POST http://<tailscale-ip>:5000/api/ingest`（`dashboard` 経由。Blueprint `ingest_bp`）
 
-### リクエスト形式
+### リクエスト形式（概要）
 
-**ヘルスデータ**
-```json
-{
-  "source": "health",
-  "date": "2026-03-22",
-  "steps": 8342,
-  "active_calories": 420,
-  "heart_rate_avg": 72,
-  "heart_rate_max": 135,
-  "heart_rate_min": 52,
-  "exercise_minutes": 35,
-  "stand_hours": 10
-}
-```
+**ヘルス** — `source`: `health`, `date`（`YYYY-MM-DD` または ISO・サーバー側で JST 暦日に正規化）。指標は任意キー（`steps`, `active_calories`, `heart_rate_avg`, …）。**`health_segment`**: `movement` | `activity` で省略可（省略時は 1 日 1 `logs` 行、指定時は `original_id` が `日付#movement` 等で最大 2 行）。**`archive`**: 手動の過去日投入用。真相当なら `logs.timestamp` を当該 `date` の JST 23:49（movement）または 23:50（それ以外）に固定。
 
-**写真メタデータ**
-```json
-{
-  "source": "photo",
-  "photos": [
-    {"timestamp": "2026-03-22T14:23:00+09:00", "lat": 35.6762, "lng": 139.6503}
-  ]
-}
-```
+**写真** — 現行は `count`（ダミー可）+ **`photo_json`**（JSON 配列文字列、`t` / `loc`）が主。旧形式の `photos` 配列（`lat`/`lng`）も `ingest` 内で処理あり。
 
-### 実行タイミング
-- ヘルスデータ：毎日 23:00 自動実行
-- 写真メタデータ：毎日 23:05 自動実行
+**スクリーンタイム** — `source`: `screen_time`, `screen_time_seconds`（Jomo）。
+
+### 実行タイミング（目安・オートメーション）
+- ヘルス：負荷分散のため **23:00 前後（movement）** と **数分後（activity）** の 2 本、または 1 本でまとめて送信
+- 写真：ヘルスと重ならない **23:06 前後** など
+- Jomo：その後のスロット（例: 23:10）
 
 ---
 
