@@ -92,6 +92,7 @@ stallプロジェクトの日記を収集し、日次サマリーの文脈補完
 - **状態**: 実装済み（`importers/streaming_csv.py`、`db/migrate_streaming_views.sql`）。
 - **手順**: `docs/importers.md` の「Netflix / Amazon Prime Video（CSV）」を参照。
 - **入力例**: `~/planet-data/exports/NetflixViewingHistory.csv`、`watch-history-export-*.csv`。
+  - **補足**: CSVによっては日時にタイムゾーン表記が無く、視聴時刻がズレる場合がある。`config/settings.toml` の `[streaming_import]`（`netflix_activity_tz` / `prime_tz` 等）で解釈TZを調整（詳細は `docs/importers.md`）。
 
 ---
 

@@ -32,6 +32,17 @@ JST = ZoneInfo("Asia/Tokyo")
 BATCH = 500
 
 
+def _parse_tz(name: str | None, *, default: ZoneInfo = JST) -> ZoneInfo:
+    """設定のタイムゾーン名を ZoneInfo に変換（無効なら default）。"""
+    s = (name or "").strip()
+    if not s:
+        return default
+    try:
+        return ZoneInfo(s)
+    except Exception:
+        return default
+
+
 @dataclass
 class ImportResult:
     """プログラム/API から参照する取り込み結果。"""
@@ -74,15 +85,15 @@ def netflix_original_id(title: str, date_raw: str) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
-def netflix_watched_at_utc(date_mdy: str) -> datetime:
+def netflix_watched_at_utc(date_mdy: str, *, local_tz: ZoneInfo = JST) -> datetime:
     d = datetime.strptime(date_mdy.strip(), "%m/%d/%y").date()
-    local = datetime(d.year, d.month, d.day, 12, 0, 0, tzinfo=JST)
+    local = datetime(d.year, d.month, d.day, 12, 0, 0, tzinfo=local_tz)
     return local.astimezone(timezone.utc)
 
 
-def netflix_simple_row_date_jst(date_raw: str) -> date:
+def netflix_simple_row_date_jst(date_raw: str, *, local_tz: ZoneInfo = JST) -> date:
     """簡易版 Date 列が指す暦日（JST）。"""
-    return netflix_watched_at_utc(date_raw).astimezone(JST).date()
+    return netflix_watched_at_utc(date_raw, local_tz=local_tz).astimezone(JST).date()
 
 
 def get_netflix_cutoff_date_jst(cur) -> date | None:
@@ -108,10 +119,10 @@ def netflix_activity_original_id(title: str, start_raw: str) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
-def netflix_activity_watched_at_utc(start_raw: str) -> datetime:
+def netflix_activity_watched_at_utc(start_raw: str, *, local_tz: ZoneInfo = JST) -> datetime:
     s = (start_raw or "").strip()
     naive = datetime.strptime(s, "%Y-%m-%d %H:%M:%S")
-    return naive.replace(tzinfo=JST).astimezone(timezone.utc)
+    return naive.replace(tzinfo=local_tz).astimezone(timezone.utc)
 
 
 def prime_original_id(row: dict) -> str:
@@ -125,7 +136,7 @@ def prime_original_id(row: dict) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
-def prime_watched_at_utc(date_watched: str) -> datetime:
+def prime_watched_at_utc(date_watched: str, *, local_tz: ZoneInfo = JST) -> datetime:
     s = (date_watched or "").strip()
     if not s:
         raise ValueError("Date Watched が空です")
@@ -133,7 +144,7 @@ def prime_watched_at_utc(date_watched: str) -> datetime:
         naive = datetime.strptime(s, "%Y-%m-%d %H:%M:%S.%f")
     else:
         naive = datetime.strptime(s, "%Y-%m-%d %H:%M:%S")
-    return naive.replace(tzinfo=JST).astimezone(timezone.utc)
+    return naive.replace(tzinfo=local_tz).astimezone(timezone.utc)
 
 
 def prime_watched_on(watched_at_utc: datetime) -> date:
@@ -350,6 +361,24 @@ def import_streaming_csv(
             "Netflix 視聴アクティビティ詳細: Start Time を JST として解釈し logs.timestamp に保存"
         )
 
+    # ---- タイムゾーン解釈（CSV は tz 表記が無いので設定で補う） ----
+    # 既存挙動の互換: 未設定は Asia/Tokyo（JST）として扱う
+    cfg = load_config()
+    si = cfg.get("streaming_import") or {}
+    tz_nf_simple = _parse_tz(si.get("netflix_simple_tz"), default=JST)
+    tz_nf_activity = _parse_tz(si.get("netflix_activity_tz"), default=JST)
+    tz_prime = _parse_tz(si.get("prime_tz"), default=JST)
+    if (si.get("netflix_simple_tz") or "").strip() and tz_nf_simple == JST:
+        messages.append("警告: streaming_import.netflix_simple_tz が不正 → Asia/Tokyo を使用")
+    if (si.get("netflix_activity_tz") or "").strip() and tz_nf_activity == JST:
+        messages.append("警告: streaming_import.netflix_activity_tz が不正 → Asia/Tokyo を使用")
+    if (si.get("prime_tz") or "").strip() and tz_prime == JST:
+        messages.append("警告: streaming_import.prime_tz が不正 → Asia/Tokyo を使用")
+    messages.append(
+        "日時の解釈TZ: netflix_simple="
+        f"{tz_nf_simple.key}, netflix_activity={tz_nf_activity.key}, prime={tz_prime.key}"
+    )
+
     if netflix_profile is not None:
         n0 = len(rows)
         rows = [r for r in rows if (r.get("Profile Name") or "").strip() == netflix_profile]
@@ -407,7 +436,7 @@ def import_streaming_csv(
             messages=messages,
         )
 
-    config = load_config()
+    config = cfg
     conn = get_db_conn(config)
     cur = conn.cursor()
     ok = skip = err = 0
@@ -428,11 +457,11 @@ def import_streaming_csv(
                         raise ValueError("strict: 空の Title/Date")
                     continue
                 try:
-                    row_d = netflix_simple_row_date_jst(date_raw)
+                    row_d = netflix_simple_row_date_jst(date_raw, local_tz=tz_nf_simple)
                     if co is not None and row_d <= co:
                         skip += 1
                         continue
-                    ts = netflix_watched_at_utc(date_raw)
+                    ts = netflix_watched_at_utc(date_raw, local_tz=tz_nf_simple)
                     watched_on = ts.astimezone(JST).date()
                 except ValueError as e:
                     err += 1
@@ -473,7 +502,7 @@ def import_streaming_csv(
                         raise ValueError("strict: 空の Title/Start Time")
                     continue
                 try:
-                    ts = netflix_activity_watched_at_utc(start_raw)
+                    ts = netflix_activity_watched_at_utc(start_raw, local_tz=tz_nf_activity)
                     watched_on = ts.astimezone(JST).date()
                 except ValueError as e:
                     err += 1
@@ -530,7 +559,7 @@ def import_streaming_csv(
                         raise ValueError("strict: Date Watched 空")
                     continue
                 try:
-                    watched_at = prime_watched_at_utc(dw)
+                    watched_at = prime_watched_at_utc(dw, local_tz=tz_prime)
                     watched_on = prime_watched_on(watched_at)
                 except ValueError as e:
                     err += 1

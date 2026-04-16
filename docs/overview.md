@@ -102,4 +102,6 @@ planet/
 
 → `docs/current_state.md` を参照（Netflix / Prime 視聴履歴 CSV インポートは `docs/importers.md` に手順あり）
 
+※ Netflix / Prime の CSV は日時にタイムゾーン表記が無いことがあり、視聴時刻が **±9時間**ズレて見える場合がある。`config/settings.toml` の `[streaming_import]`（`netflix_activity_tz` / `prime_tz` 等）で解釈TZを調整する（詳細は `docs/importers.md` の「タイムゾーン（重要）」）。
+
 Phase 6（AI 生成・Neocities）の実装手順 → **`docs/phase6_plan.md`**

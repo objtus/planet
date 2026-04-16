@@ -85,3 +85,12 @@ debug      = false
 [streaming_import]
 netflix_profile = "ホ"
 
+# Netflix/Prime の CSV は日時にタイムゾーン表記が無い。
+# 実際のエクスポート仕様に合わせて「その日時が何TZのローカル時刻か」を指定する。
+#
+# 既定は互換のため Asia/Tokyo（JST）。
+# もしエクスポートが UTC 基準に見える（常に +9h ずれる等）なら "UTC" に変更する。
+netflix_simple_tz = "Asia/Tokyo"    # Netflix 簡易版 Date（時刻なし→正午で保存）
+netflix_activity_tz = "Asia/Tokyo"  # Netflix 詳細 Start Time
+prime_tz = "Asia/Tokyo"             # Prime Date Watched
+
