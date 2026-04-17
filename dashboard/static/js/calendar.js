@@ -746,12 +746,13 @@ async function fetchSummaryPayload(period, dateStr) {
 
 const TOPIC_LABEL_MAP = {
   music:    '音楽',
+  media:    'メディア視聴',
   health:   '健康・活動',
   sns:      'SNS・投稿',
   dev:      '開発',
   behavior: '行動推測',
 };
-const TOPIC_ORDER = ['sns', 'music', 'health', 'dev', 'behavior'];
+const TOPIC_ORDER = ['sns', 'music', 'media', 'health', 'dev', 'behavior'];
 
 function _renderMd(text) {
   if (typeof renderSummaryMarkdown === 'function') return renderSummaryMarkdown(text);
@@ -889,7 +890,7 @@ async function renderSummaryPanelWeekOrMonth(kind, payload, dateStrForApi) {
   }
 
   // トピックアコーディオン（music / health / sns / dev / behavior）
-  const weekTopicOrder = ['sns', 'music', 'health', 'dev', 'behavior'];
+  const weekTopicOrder = ['sns', 'music', 'media', 'health', 'dev', 'behavior'];
   const hasTopics = weekTopicOrder.some(t => topics[t] && topics[t].content);
   if (hasTopics) {
     const wrap = document.createElement('div');

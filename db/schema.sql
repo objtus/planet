@@ -186,7 +186,7 @@ CREATE TABLE url_metadata (
 
 -- 5-11. summaries
 -- period_type: 'weekly' | 'monthly' | 'daily'（日次は週次階層生成時に保存、一覧 /summaries では週・月のみ表示）
--- summary_type: 'full' | 'music' | 'health' | 'sns' | 'dev' | 'behavior' | 'oneword' | 'best_post'
+-- summary_type: 'full' | 'music' | 'media' | 'health' | 'sns' | 'dev' | 'behavior' | 'oneword' | 'best_post'
 --   旧パイプライン（--legacy）は常に 'full'。新トピック別パイプラインは各種別を個別に保存。
 CREATE TABLE summaries (
     id           BIGSERIAL PRIMARY KEY,

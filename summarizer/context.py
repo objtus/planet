@@ -140,7 +140,8 @@ def fetch_activity_digest_for_day(
 
 # トピック別生成用: ソース種別→トピック名の対応
 TOPIC_SOURCE_TYPES: dict[str, list[str]] = {
-    "music":  ["lastfm"],
+    "music":  ["lastfm", "misskey", "mastodon"],
+    "media":  ["netflix", "prime", "misskey", "mastodon"],
     "health": ["health", "photo", "screen_time"],
     "sns":    ["misskey", "mastodon"],
     "dev":    ["github"],

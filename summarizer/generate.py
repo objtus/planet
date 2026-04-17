@@ -60,12 +60,13 @@ from summarizer.week_bounds import parse_iso_week_date, week_label, week_utc_ran
 _PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
 
 # 新パイプラインの summary_type 一覧（生成順）
-DAILY_TOPICS = ["music", "health", "sns", "dev"]
-ALL_TOPIC_TYPES = ["music", "health", "sns", "dev", "behavior", "full", "oneword"]
+DAILY_TOPICS = ["music", "media", "health", "sns", "dev"]
+ALL_TOPIC_TYPES = ["music", "media", "health", "sns", "dev", "behavior", "full", "oneword"]
 
 # トピック名→日本語ラベル（プロンプト内 {{TOPIC_LABEL}} 置換用）
 TOPIC_LABELS: dict[str, str] = {
     "music":    "音楽",
+    "media":    "メディア視聴",
     "health":   "健康・活動",
     "sns":      "SNS・投稿",
     "dev":      "開発",
@@ -580,11 +581,12 @@ def _run_day_topics(
     day_label = f"{day.strftime('%Y-%m-%d')}（JST）"
     day_iso = day.isoformat()
 
-    # ① 各トピックの生ログを取得（SNS トピックはアカウント名を含める）
+    # ① 各トピックの生ログを取得（SNS ソースを含むトピックはアカウント名を含める）
+    SNS_TYPES = {"sns", "music", "media"}  # source_name_map を使うトピック
     source_name_map = get_source_name_map(conn)
     topic_digests: dict[str, str] = {}
     for topic, src_types in TOPIC_SOURCE_TYPES.items():
-        use_name_map = source_name_map if topic == "sns" else None
+        use_name_map = source_name_map if topic in SNS_TYPES else None
         topic_digests[topic] = fetch_topic_digest_for_day(
             conn, day, src_types, source_name_map=use_name_map
         )
@@ -603,7 +605,7 @@ def _run_day_topics(
             print(f"===== 日次トピックプロンプト [{topic}] {day_label} =====\n{prompt}\n")
         return 0
 
-    total_steps = len(DAILY_TOPICS) + 3  # 4 topics + behavior + full + oneword
+    total_steps = len(DAILY_TOPICS) + 3  # 5 topics (music/media/health/sns/dev) + behavior + full + oneword
     step = 0
     topic_results: dict[str, str] = {}
 
@@ -759,7 +761,7 @@ def _run_week_topics(
 
     # ① 各トピック（7日分の日次結果 → topic_summary）
     topic_weekly: dict[str, str] = {}
-    total_topics = len(DAILY_TOPICS) + 1 + 1 + 1 + 1  # +behavior +full +oneword +best_post
+    total_topics = len(DAILY_TOPICS) + 1 + 1 + 1 + 1  # 5 topics +behavior +full +oneword +best_post
     step = 0
 
     topic_tmpl = _load_template("topic_summary")
@@ -915,7 +917,7 @@ def _run_month_topics(
         return 0
 
     topic_monthly: dict[str, str] = {}
-    total_topics = len(DAILY_TOPICS) + 1 + 1 + 1  # +behavior +full +oneword
+    total_topics = len(DAILY_TOPICS) + 1 + 1 + 1  # 5 topics +behavior +full +oneword
     step = 0
     topic_tmpl = _load_template("topic_summary")
 
