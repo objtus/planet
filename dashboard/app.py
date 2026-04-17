@@ -953,6 +953,9 @@ def create_app():
         use_legacy = bool(data.get("legacy"))
         if use_legacy:
             cmd.extend(["--legacy", "--pipeline", "hierarchical"])
+        # 強制再生成: 既存キャッシュを無視して全トピックを再生成
+        if bool(data.get("regenerate")):
+            cmd.append("--regenerate-daily")
         env_base = {**os.environ, "PYTHONPATH": str(ROOT)}
         # subprocess.run の上限。週次は複数トピック×7日分になり得るため長めに。
         gen_timeout = 7200 if period == "day" else 18000

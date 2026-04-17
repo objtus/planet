@@ -578,6 +578,25 @@ select {
   opacity: 0.65;
   cursor: not-allowed;
 }
+.summary-regenerate-btn {
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: var(--border-radius-sm);
+  border: 0.5px solid var(--color-text-tertiary);
+  background: transparent;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  white-space: nowrap;
+  margin-left: 4px;
+}
+.summary-regenerate-btn:hover:not(:disabled) {
+  border-color: var(--color-danger, #c0392b);
+  color: var(--color-danger, #c0392b);
+}
+.summary-regenerate-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 .summary-generate-progress {
   width: 100%;
   flex-basis: 100%;

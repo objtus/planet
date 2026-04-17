@@ -698,6 +698,7 @@ function hideSummaryPanel() {
   p.hidden = true;
   const title = document.getElementById('summary-panel-title');
   const genBtn = document.getElementById('summary-generate-btn');
+  const regenBtn = document.getElementById('summary-regenerate-btn');
   const body = document.getElementById('summary-panel-body');
   if (title) title.textContent = '';
   if (genBtn) {
@@ -708,7 +709,30 @@ function hideSummaryPanel() {
     delete genBtn.dataset.viewKind;
     genBtn.textContent = 'この期間で生成';
   }
+  if (regenBtn) {
+    regenBtn.hidden = true;
+    regenBtn.disabled = false;
+  }
   if (body) body.replaceChildren();
+}
+
+/** 生成ボタン・強制再生成ボタンをまとめて設定する。
+ * hasSummary=true のとき強制再生成ボタンを表示する。
+ */
+function _setupGenerateButtons(period, dateStr, viewKind, hasSummary) {
+  const genBtn = document.getElementById('summary-generate-btn');
+  const regenBtn = document.getElementById('summary-regenerate-btn');
+  if (!genBtn) return;
+  genBtn.hidden = false;
+  genBtn.dataset.period = period;
+  genBtn.dataset.date = String(dateStr);
+  genBtn.dataset.viewKind = viewKind;
+  genBtn.disabled = false;
+  genBtn.textContent = hasSummary ? 'サマリーを更新' : 'この期間で生成';
+  if (regenBtn) {
+    regenBtn.hidden = !hasSummary;
+    regenBtn.disabled = false;
+  }
 }
 
 async function fetchSummaryPayload(period, dateStr) {
@@ -740,19 +764,10 @@ function _renderMd(text) {
 async function renderSummaryPanelDay(payload, isoDateStr) {
   const p = document.getElementById('summary-panel');
   const title = document.getElementById('summary-panel-title');
-  const genBtn = document.getElementById('summary-generate-btn');
   const body = document.getElementById('summary-panel-body');
   if (!p || !title || !body) return;
   p.hidden = false;
   title.textContent = '日次サマリー';
-  if (genBtn) {
-    genBtn.hidden = false;
-    genBtn.dataset.period = 'day';
-    genBtn.dataset.date = String(isoDateStr);
-    genBtn.dataset.viewKind = 'day';
-    genBtn.disabled = false;
-    genBtn.textContent = 'この日の日次を生成';
-  }
   body.replaceChildren();
 
   // トピック別データを取得
@@ -763,6 +778,8 @@ async function renderSummaryPanelDay(payload, isoDateStr) {
   } catch (_) { /* 無視して full だけ表示 */ }
 
   const sum = payload && payload.summary;
+  const hasSummary = !!(sum && sum.content) || Object.keys(topics).length > 0;
+  _setupGenerateButtons('day', isoDateStr, 'day', hasSummary);
 
   // oneword バッジ
   if (topics.oneword && topics.oneword.content) {
@@ -817,19 +834,10 @@ async function renderSummaryPanelDay(payload, isoDateStr) {
 async function renderSummaryPanelWeekOrMonth(kind, payload, dateStrForApi) {
   const p = document.getElementById('summary-panel');
   const title = document.getElementById('summary-panel-title');
-  const genBtn = document.getElementById('summary-generate-btn');
   const body = document.getElementById('summary-panel-body');
   if (!p || !title || !body) return;
   p.hidden = false;
   title.textContent = kind === 'week' ? '週次サマリー' : '月次サマリー';
-  if (genBtn) {
-    genBtn.hidden = false;
-    genBtn.dataset.period = kind === 'week' ? 'week' : 'month';
-    genBtn.dataset.date = String(dateStrForApi);
-    genBtn.dataset.viewKind = kind;
-    genBtn.disabled = false;
-    genBtn.textContent = 'この期間で生成';
-  }
   body.replaceChildren();
 
   // トピック別データを取得
@@ -843,6 +851,8 @@ async function renderSummaryPanelWeekOrMonth(kind, payload, dateStrForApi) {
   } catch (_) { /* 無視して full だけ表示 */ }
 
   const sum = payload && payload.summary;
+  const hasSummary = !!(sum && sum.content) || Object.keys(topics).length > 0;
+  _setupGenerateButtons(kind === 'week' ? 'week' : 'month', dateStrForApi, kind, hasSummary);
 
   // oneword バッジ
   if (topics.oneword && topics.oneword.content) {
@@ -907,6 +917,7 @@ function renderSummaryPanelYear(year, summaries) {
   const p = document.getElementById('summary-panel');
   const title = document.getElementById('summary-panel-title');
   const genBtn = document.getElementById('summary-generate-btn');
+  const regenBtn = document.getElementById('summary-regenerate-btn');
   const body = document.getElementById('summary-panel-body');
   if (!p || !title || !body) return;
   p.hidden = false;
@@ -918,6 +929,7 @@ function renderSummaryPanelYear(year, summaries) {
     delete genBtn.dataset.date;
     delete genBtn.dataset.viewKind;
   }
+  if (regenBtn) { regenBtn.hidden = true; regenBtn.disabled = false; }
   body.replaceChildren();
   const list = Array.isArray(summaries) ? summaries : [];
   if (!list.length) {
@@ -1013,8 +1025,9 @@ async function consumeNdjsonSummaryStream(response, onProgress) {
   return lastDone;
 }
 
-async function onSummaryGenerateClick() {
+async function onSummaryGenerateClick(forceRegenerate = false) {
   const btn = document.getElementById('summary-generate-btn');
+  const regenBtn = document.getElementById('summary-regenerate-btn');
   const progEl = document.getElementById('summary-generate-progress');
   if (!btn || btn.hidden || btn.disabled) return;
   const period = btn.dataset.period;
@@ -1023,11 +1036,12 @@ async function onSummaryGenerateClick() {
   if (!period || !date || !viewKind) return;
 
   btn.disabled = true;
+  if (regenBtn) regenBtn.disabled = true;
   const orig = btn.textContent;
   btn.textContent = '生成中…';
   if (progEl) {
     progEl.hidden = false;
-    progEl.textContent = '開始しています…';
+    progEl.textContent = forceRegenerate ? '強制再生成しています…' : '開始しています…';
   }
 
   const ctrl = new AbortController();
@@ -1035,10 +1049,12 @@ async function onSummaryGenerateClick() {
   const abortTid = setTimeout(() => ctrl.abort(), abortMs);
 
   try {
+    const body = { period, date, stream: true };
+    if (forceRegenerate) body.regenerate = true;
     const r = await fetch('/api/summaries/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ period, date, stream: true }),
+      body: JSON.stringify(body),
       signal: ctrl.signal,
     });
     const ct = (r.headers.get('content-type') || '').toLowerCase();
@@ -1100,6 +1116,7 @@ async function onSummaryGenerateClick() {
   } finally {
     clearTimeout(abortTid);
     btn.disabled = false;
+    if (regenBtn) regenBtn.disabled = false;
     btn.textContent = orig;
     if (progEl) {
       progEl.hidden = true;
@@ -1655,7 +1672,13 @@ document.getElementById('timeline')?.addEventListener('click', (ev) => {
 });
 
 document.getElementById('summary-generate-btn')?.addEventListener('click', () => {
-  void onSummaryGenerateClick();
+  void onSummaryGenerateClick(false);
+});
+
+document.getElementById('summary-regenerate-btn')?.addEventListener('click', () => {
+  if (confirm('既存のサマリーをすべて削除して再生成します。よろしいですか？')) {
+    void onSummaryGenerateClick(true);
+  }
 });
 
 {
