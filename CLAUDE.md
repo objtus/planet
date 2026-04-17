@@ -7,12 +7,12 @@ This file provides essential context for AI assistants working on the **Planet**
 ## Project Overview
 
 Planet is a self-hosted personal data aggregator running on Ubuntu 24.04. It:
-- Collects data from 17+ sources (Misskey, Mastodon, Last.fm, GitHub, YouTube, weather, iPhone health, Scrapbox, etc.)
+- Collects data from 20 sources (Misskey, Mastodon, Last.fm, GitHub, YouTube, weather, iPhone health, Scrapbox, Netflix, Amazon Prime Video, etc.)
 - Stores everything in a PostgreSQL database
-- Generates AI-written summaries via Ollama (gemma3:12b)
+- Generates AI-written summaries via Ollama (gemma3:12b) using a topic-based pipeline
 - Exposes a private Flask dashboard (Tailscale-only, port 5000)
 
-**Current Phase**: Phase 6 (AI summaries & Neocities publishing) — M1/M2 complete, M3–M6 in progress.
+**Current Phase**: Phase 6 (AI summaries & Neocities publishing) — M1/M2 + topic-based summarizer pipeline complete, M3–M6 in progress.
 
 ---
 
@@ -24,13 +24,18 @@ planet/
 ├── importers/           # One-time historical JSON importers
 ├── ingest/              # Flask API endpoints for iPhone health/photo data
 ├── summarizer/          # AI summary generation (Ollama)
-│   ├── generate.py      # Main CLI entry point (~848 lines)
+│   ├── generate.py      # Main CLI entry point (topic-based pipeline)
+│   ├── context.py       # Log fetching helpers (TOPIC_SOURCE_TYPES, source_name_map, fetch_lastfm_digest_for_day)
 │   └── prompts/         # Markdown prompt templates with {{PLACEHOLDER}} syntax
+│       # daily_music.txt / daily_media.txt / daily_health.txt / daily_sns.txt / daily_dev.txt
+│       # daily_behavior.txt / daily_full.txt / topic_summary.txt / period_full.txt
+│       # oneword.txt / best_post.txt  ← new topic pipeline
+│       # weekly_hybrid.txt / monthly_hybrid.txt / daily_hybrid.txt  ← legacy (--legacy)
 ├── publisher/           # planet-feed JSON (`python -m publisher.build_feed`) — Neocities summary HTML (M4) TBD
 ├── dashboard/           # Flask web UI
 │   ├── app.py           # Core Flask application (~1,167 lines)
 │   ├── static/          # CSS, JS, bundled libraries (Chart.js, marked, DOMPurify)
-│   └── templates/       # Jinja2 HTML templates (7 files)
+│   └── templates/       # Jinja2 HTML templates (9 files incl. prompts.html, settings.html)
 ├── db/
 │   └── schema.sql       # PostgreSQL schema (source of truth for DB structure)
 ├── cron/
@@ -99,8 +104,9 @@ Schema is defined in `db/schema.sql`. Always treat this file as the source of tr
 
 ### Core tables
 
-**`data_sources`** — Registry of all 17 data sources
+**`data_sources`** — Registry of all 20 data sources (id 1–20)
 - `id, name, type, base_url, account, config (JSONB), is_active, sort_order, short_name`
+- Notable: id=19 `Netflix` (type `netflix`), id=20 `Amazon Prime Video` (type `prime`)
 
 **`logs`** — Unified timeline (36,000+ rows)
 - `id, source_id, original_id, content, url, metadata (JSONB), is_deleted, timestamp, created_at`
@@ -118,7 +124,12 @@ Schema is defined in `db/schema.sql`. Always treat this file as the source of tr
 - `scrapbox_pages` — `page_title, content, content_plain`
 
 **`url_metadata`** — OGP/Open Graph cache
-**`summaries`** — AI-generated summaries (`period_type`, `period_start`, `period_end`, `content`, `model`, `is_published`)
+**`summaries`** — AI-generated summaries
+- `period_type` (`'daily'`/`'weekly'`/`'monthly'`), `period_start`, `period_end`, `week_number`
+- `summary_type` (`'music'`/`'media'`/`'health'`/`'sns'`/`'dev'`/`'behavior'`/`'full'`/`'oneword'`/`'best_post'`)
+- `content`, `model`, `prompt_style`, `is_published`
+- UNIQUE: `(period_type, period_start, summary_type)` — CONSTRAINT `summaries_unique`
+- Migration: `db/migrate_summary_type.sql` (requires `postgres` owner)
 
 ### Key schema conventions
 
@@ -149,10 +160,11 @@ python -m collectors.lastfm
 python collect_all.py
 
 # Generate a summary (dry run first)
-python -m summarizer.generate --period week --date 2025-W52 --dry-run
-python -m summarizer.generate --period week --date 2025-W52
+python -m summarizer.generate --period day --date 2025-12-31 --dry-run
+python -m summarizer.generate --period day --date 2025-12-31          # all topics
+python -m summarizer.generate --period week --date 2025-W52           # uses cached dailies
 python -m summarizer.generate --period month --date 2025-12
-python -m summarizer.generate --period day --date 2025-12-31
+python -m summarizer.generate --period day --date 2025-12-31 --regenerate-daily  # force
 
 # Planet feed JSON → ~/planet-feed (see docs/planet_feed_setup.md)
 python -m publisher.build_feed --dry-run
@@ -213,7 +225,9 @@ Each collector lives in `collectors/<source>.py` and follows a consistent patter
 
 - Markdown templates using `{{PLACEHOLDER}}` syntax for variable substitution
 - Language: Japanese (all prompts and generated content are in Japanese)
-- Hierarchy: daily → weekly → monthly summaries
+- **Topic pipeline** (new): `daily_music.txt` / `daily_media.txt` / `daily_health.txt` / `daily_sns.txt` / `daily_dev.txt` / `daily_full.txt` / `oneword.txt` / `best_post.txt`
+- **Legacy** (`--legacy` flag): `daily_hybrid.txt` / `weekly_hybrid.txt` / `monthly_hybrid.txt`
+- Prompts are editable from the dashboard at `/prompts`
 
 ### Error handling
 
@@ -231,16 +245,25 @@ Each collector lives in `collectors/<source>.py` and follows a consistent patter
 |---|---|---|
 | GET | `/` | Calendar view (main UI) |
 | GET | `/search` | Keyword search (`q`) + optional `source_id`, `date_from`, `date_to` |
+| GET | `/prompts` | Prompt file editor UI |
+| GET | `/settings` | Ollama / summarizer settings UI |
 | GET | `/api/heatmap` | Heatmap data (`?year=Y&month=M&metric=posts/plays/steps/weather`) |
 | GET | `/api/timeline` | Timeline entries (`?date=YYYY-MM-DD&period=day/week/month/year&sources=…`) |
 | GET | `/api/stats` | Statistics aggregates (`?period=month/year`) |
-| GET | `/api/summaries` | List all published summaries |
-| GET | `/api/summary` | Single summary (`?period=week/month&date=YYYY-Www/YYYY-MM`) |
+| GET | `/api/summaries` | List published summaries (`summary_type='full'`, weekly/monthly only) |
+| GET | `/api/summary` | Single `full` summary (`?period=week/month/day&date=…`) |
+| GET | `/api/summary/topics` | All topic summaries for a period (`?period=day&date=YYYY-MM-DD` / `week` / `month`) |
+| POST | `/api/summaries/generate` | Generate summary (`period`, `date`; `regenerate: true` for force) |
+| PATCH | `/api/summaries/<id>/publish` | Toggle publication status |
+| GET | `/api/prompts` | List prompt file names |
+| GET | `/api/prompts/<name>` | Get prompt file content |
+| POST | `/api/prompts/<name>` | Save prompt file content |
+| GET | `/api/settings` | Get summarizer/Ollama settings |
+| POST | `/api/settings` | Update summarizer/Ollama settings |
 | GET | `/api/sources` | List all data sources |
 | POST | `/api/collect/<stype>` | Manually trigger collection for a source type |
 | POST | `/api/import/streaming-csv` | Netflix / Prime viewing history CSV (`multipart`: `file`, optional `netflix_profile`). Sources page drag-and-drop |
 | POST | `/api/logs/<id>/soft-delete` | Soft-delete one Last.fm log (`is_deleted`; Last.fm only). Used from calendar and search timelines |
-| PATCH | `/api/summaries/<id>/publish` | Toggle publication status |
 | POST | `/api/ingest` | iPhone ショートカット統合（JSON `source`: `health` / `photo` / `screen_time`）。ヘルスは任意 `health_segment`、`archive`（手動過去投入のタイムライン日付固定）。詳細 `docs/iphone_shortcuts.md` |
 
 ---
@@ -267,6 +290,8 @@ Always check `docs/` before making architectural decisions:
 | `docs/overview.md` | Project goals and tech stack summary |
 | `docs/current_state.md` | Phase/milestone status checklist |
 | `docs/design.md` | Full architecture & DB schema rationale (19KB) |
+| `docs/summary_daily_and_dashboard.md` | Topic-based summarizer pipeline spec, DB contract, dashboard API |
+| `docs/summarizer_quality_plan.md` | Design background for topic-based pipeline |
 | `docs/dashboard_ui.md` | Calendar / search / timeline UI behavior (links, Last.fm delete) |
 | `docs/setup.md` | Installation walkthrough |
 | `docs/decisions.md` | Design rationale (why PostgreSQL, Ollama, etc.) |
