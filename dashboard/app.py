@@ -4,6 +4,7 @@ import csv
 import json
 import os
 import queue
+import re
 import subprocess
 import sys
 import tempfile
@@ -630,6 +631,7 @@ def create_app():
                        week_number, content, model, is_published, created_at
                   FROM summaries
                  WHERE period_type IN ('weekly', 'monthly')
+                   AND summary_type = 'full'
                  ORDER BY period_start DESC
             """)
             rows  = cur.fetchall()
@@ -708,7 +710,9 @@ def create_app():
                     SELECT id, period_type, period_start, period_end, week_number,
                            content, model, is_published, published_at
                       FROM summaries
-                     WHERE period_type = 'daily' AND period_start = %s
+                     WHERE period_type = 'daily'
+                       AND period_start = %s
+                       AND summary_type = 'full'
                     """,
                     (day,),
                 )
@@ -729,7 +733,9 @@ def create_app():
                     SELECT id, period_type, period_start, period_end, week_number,
                            content, model, is_published, published_at
                       FROM summaries
-                     WHERE period_type = 'weekly' AND period_start = %s
+                     WHERE period_type = 'weekly'
+                       AND period_start = %s
+                       AND summary_type = 'full'
                     """,
                     (monday,),
                 )
@@ -749,7 +755,9 @@ def create_app():
                     SELECT id, period_type, period_start, period_end, week_number,
                            content, model, is_published, published_at
                       FROM summaries
-                     WHERE period_type = 'monthly' AND period_start = %s
+                     WHERE period_type = 'monthly'
+                       AND period_start = %s
+                       AND summary_type = 'full'
                     """,
                     (first,),
                 )
@@ -771,6 +779,7 @@ def create_app():
                        content, model, is_published, published_at
                   FROM summaries
                  WHERE period_type = 'monthly'
+                   AND summary_type = 'full'
                    AND period_start >= %s AND period_start <= %s
                  ORDER BY period_start ASC
                 """,
@@ -780,6 +789,73 @@ def create_app():
             return jsonify(
                 {"summaries": [_summary_row_to_api_dict(r) for r in rows]}
             )
+        finally:
+            cur.close()
+            conn.close()
+
+    @app.route("/api/summary/topics")
+    def api_summary_topics():
+        """period の全 summary_type を返す。日次・週次・月次トピックパネル用。
+        period=day   date=YYYY-MM-DD
+        period=week  date=YYYY-Www
+        period=month date=YYYY-MM
+        """
+        period = (request.args.get("period") or "day").strip().lower()
+        date_arg = (request.args.get("date") or "").strip()
+        conn = get_db_conn()
+        cur = conn.cursor()
+        try:
+            if period == "day":
+                try:
+                    target_day = date.fromisoformat(date_arg)
+                except ValueError:
+                    return jsonify({"error": "date must be YYYY-MM-DD"}), 400
+                period_type = "daily"
+                period_start = target_day
+            elif period == "week":
+                s = date_arg.upper()
+                if "-W" not in s:
+                    return jsonify({"error": "date must be YYYY-Www for week"}), 400
+                y_str, w_str = s.split("-W", 1)
+                try:
+                    period_start = datetime.strptime(
+                        f"{int(y_str)}-{int(w_str):02d}-1", "%G-%V-%u"
+                    ).date()
+                except (ValueError, TypeError):
+                    return jsonify({"error": "invalid week date"}), 400
+                period_type = "weekly"
+            elif period == "month":
+                try:
+                    y, m = map(int, date_arg.split("-", 1))
+                    period_start = date(y, m, 1)
+                except (ValueError, TypeError):
+                    return jsonify({"error": "date must be YYYY-MM for month"}), 400
+                period_type = "monthly"
+            else:
+                return jsonify({"error": "period must be day|week|month"}), 400
+
+            cur.execute(
+                """
+                SELECT summary_type, content, model, prompt_style, created_at
+                  FROM summaries
+                 WHERE period_type = %s
+                   AND period_start = %s
+                 ORDER BY summary_type
+                """,
+                (period_type, period_start),
+            )
+            rows = cur.fetchall()
+            topics = {}
+            for row in rows:
+                stype, content, model_name, style, created = row
+                topics[stype] = {
+                    "content": content,
+                    "model": model_name,
+                    "prompt_style": style,
+                    "created_at": created.astimezone(JST).strftime("%Y-%m-%d %H:%M")
+                    if created else None,
+                }
+            return jsonify({"topics": topics, "period": period, "date": date_arg})
         finally:
             cur.close()
             conn.close()
@@ -860,7 +936,7 @@ def create_app():
         if not py_exe.is_file():
             return jsonify({"error": "venv/bin/python が見つかりません"}), 500
 
-        # 1 リクエストあたりの Ollama 待ち。週次階層は最大 9 回呼ぶため、壁時計は gen_timeout で別途長めに。
+        # 1 リクエストあたりの Ollama 待ち。新パイプラインは週次で最大 ~8 回呼ぶため長めに設定。
         ollama_timeout = "1800"
         cmd = [
             str(py_exe),
@@ -873,10 +949,12 @@ def create_app():
             "--timeout",
             ollama_timeout,
         ]
-        if period in ("week", "month"):
-            cmd.extend(["--pipeline", "hierarchical"])
+        # 新パイプライン（既定）では --pipeline 不要。--legacy 指定時のみ hierarchical を渡す。
+        use_legacy = bool(data.get("legacy"))
+        if use_legacy:
+            cmd.extend(["--legacy", "--pipeline", "hierarchical"])
         env_base = {**os.environ, "PYTHONPATH": str(ROOT)}
-        # subprocess.run の上限。週次は日次最大7+マージで合計が長くなりやすい。
+        # subprocess.run の上限。週次は複数トピック×7日分になり得るため長めに。
         gen_timeout = 7200 if period == "day" else 18000
 
         if want_stream:
@@ -1261,6 +1339,162 @@ def create_app():
             "messages": res.messages,
         }
         return jsonify(body), (200 if res.success else 500)
+
+    # ------------------------------------------------------------------ #
+    # 設定画面
+    # ------------------------------------------------------------------ #
+    _SETTINGS_KEYS = {
+        "ollama_base_url":       ("ollama", "base_url"),
+        "ollama_model":          ("ollama", "model"),
+        "max_log_lines_daily":   ("summarizer", "max_log_lines_daily"),
+        "max_log_lines_weekly":  ("summarizer", "max_log_lines_weekly"),
+        "max_log_lines_monthly": ("summarizer", "max_log_lines_monthly"),
+        "ollama_timeout_sec":    ("summarizer", "ollama_timeout_sec"),
+    }
+
+    @app.route("/settings")
+    def settings_page():
+        return render_template("settings.html")
+
+    @app.route("/api/settings", methods=["GET"])
+    def api_settings_get():
+        try:
+            cfg = load_config()
+            result = {}
+            ollama = cfg.get("ollama") or {}
+            summarizer = cfg.get("summarizer") or {}
+            result["ollama_base_url"]       = ollama.get("base_url", "")
+            result["ollama_model"]          = ollama.get("model", "")
+            result["max_log_lines_daily"]   = summarizer.get("max_log_lines_daily", 0)
+            result["max_log_lines_weekly"]  = summarizer.get("max_log_lines_weekly", 0)
+            result["max_log_lines_monthly"] = summarizer.get("max_log_lines_monthly", 0)
+            result["ollama_timeout_sec"]    = summarizer.get("ollama_timeout_sec", 0)
+            return jsonify(result)
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/settings", methods=["POST"])
+    def api_settings_save():
+        """settings.toml の [ollama] / [summarizer] セクションのみ更新する。"""
+        data = request.get_json(silent=True) or {}
+        try:
+            path = CONFIG_PATH
+            content = path.read_text(encoding="utf-8")
+            lines = content.splitlines(keepends=True)
+
+            def _set_toml_key(lines, section, key, value):
+                """section 内の key = value を書き換える（値が無ければセクション末に追記）。
+                value が None または空文字の場合は変更しない。
+                """
+                if value is None or (isinstance(value, str) and not value):
+                    return lines
+                if isinstance(value, int) and value == 0:
+                    return lines
+
+                in_sec = False
+                key_found = False
+                sec_end = None
+                for i, line in enumerate(lines):
+                    stripped = line.strip()
+                    if stripped == f"[{section}]":
+                        in_sec = True
+                        sec_end = i + 1
+                        continue
+                    if in_sec and stripped.startswith("[") and not stripped.startswith(f"[{section}"):
+                        in_sec = False
+                    if in_sec:
+                        if stripped and not stripped.startswith("#"):
+                            sec_end = i + 1
+                        if re.match(rf"^{re.escape(key)}\s*=", stripped):
+                            if isinstance(value, str):
+                                lines[i] = f'{key} = "{value}"\n'
+                            else:
+                                lines[i] = f"{key} = {value}\n"
+                            key_found = True
+                            break
+                if not key_found and sec_end is not None:
+                    if isinstance(value, str):
+                        new_line = f'{key} = "{value}"\n'
+                    else:
+                        new_line = f"{key} = {value}\n"
+                    lines.insert(sec_end, new_line)
+                return lines
+
+            # Ollama 設定
+            if data.get("ollama_base_url"):
+                lines = _set_toml_key(lines, "ollama", "base_url", data["ollama_base_url"])
+            if data.get("ollama_model"):
+                lines = _set_toml_key(lines, "ollama", "model", data["ollama_model"])
+
+            # Summarizer 設定（[summarizer] セクションが無ければ末尾に追記）
+            summarizer_keys = {
+                "max_log_lines_daily":   data.get("max_log_lines_daily", 0),
+                "max_log_lines_weekly":  data.get("max_log_lines_weekly", 0),
+                "max_log_lines_monthly": data.get("max_log_lines_monthly", 0),
+                "ollama_timeout_sec":    data.get("ollama_timeout_sec", 0),
+            }
+            has_summarizer_section = any(l.strip() == "[summarizer]" for l in lines)
+            if not has_summarizer_section:
+                lines.append("\n[summarizer]\n")
+
+            for key, val in summarizer_keys.items():
+                if val and val > 0:
+                    lines = _set_toml_key(lines, "summarizer", key, val)
+
+            path.write_text("".join(lines), encoding="utf-8")
+            return jsonify({"ok": True})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    # ------------------------------------------------------------------ #
+    # プロンプト編集画面
+    # ------------------------------------------------------------------ #
+    PROMPTS_DIR = ROOT / "summarizer" / "prompts"
+    _SAFE_PROMPT_NAME = re.compile(r'^[a-z][a-z0-9_]*\.txt$')
+
+    @app.route("/prompts")
+    def prompts_page():
+        return render_template("prompts.html")
+
+    @app.route("/api/prompts")
+    def api_prompts_list():
+        try:
+            files = sorted(
+                p.name for p in PROMPTS_DIR.glob("*.txt")
+            )
+            return jsonify({"files": files})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/prompts/<name>", methods=["GET"])
+    def api_prompts_get(name):
+        if not _SAFE_PROMPT_NAME.match(name):
+            return jsonify({"error": "不正なファイル名です"}), 400
+        path = PROMPTS_DIR / name
+        if not path.is_file():
+            return jsonify({"error": "ファイルが見つかりません"}), 404
+        try:
+            content = path.read_text(encoding="utf-8")
+            return jsonify({"name": name, "content": content})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/prompts/<name>", methods=["POST"])
+    def api_prompts_save(name):
+        if not _SAFE_PROMPT_NAME.match(name):
+            return jsonify({"error": "不正なファイル名です"}), 400
+        path = PROMPTS_DIR / name
+        if not path.is_file():
+            return jsonify({"error": "ファイルが見つかりません"}), 404
+        data = request.get_json(silent=True) or {}
+        content = data.get("content")
+        if content is None:
+            return jsonify({"error": "content が必要です"}), 400
+        try:
+            path.write_text(content, encoding="utf-8")
+            return jsonify({"ok": True, "name": name})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
 
     return app
 

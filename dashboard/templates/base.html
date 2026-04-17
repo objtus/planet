@@ -16,6 +16,8 @@
     <a href="{{ url_for('summaries') }}" class="nav-link {% if request.endpoint == 'summaries' %}active{% endif %}">サマリー</a>
     <a href="{{ url_for('stats') }}"     class="nav-link {% if request.endpoint == 'stats' %}active{% endif %}">統計</a>
     <a href="{{ url_for('sources') }}"   class="nav-link {% if request.endpoint == 'sources' %}active{% endif %}">ソース管理</a>
+    <a href="{{ url_for('prompts_page') }}"  class="nav-link {% if request.endpoint == 'prompts_page' %}active{% endif %}">プロンプト</a>
+    <a href="{{ url_for('settings_page') }}" class="nav-link {% if request.endpoint == 'settings_page' %}active{% endif %}">設定</a>
   </nav>
 
   {% block content %}{% endblock %}

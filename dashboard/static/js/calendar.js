@@ -557,7 +557,7 @@ async function loadDay() {
     ]);
     renderStats(stats);
     renderTimeline(tl.entries, 'day');
-    renderSummaryPanelDay(sumPayload, ds);
+    await renderSummaryPanelDay(sumPayload, ds);
   } catch (e) {
     hideSummaryPanel();
     showTimelineError(e.message);
@@ -720,7 +720,24 @@ async function fetchSummaryPayload(period, dateStr) {
   }
 }
 
-function renderSummaryPanelDay(payload, isoDateStr) {
+const TOPIC_LABEL_MAP = {
+  music:    '音楽',
+  health:   '健康・活動',
+  sns:      'SNS・投稿',
+  dev:      '開発',
+  behavior: '行動推測',
+};
+const TOPIC_ORDER = ['sns', 'music', 'health', 'dev', 'behavior'];
+
+function _renderMd(text) {
+  if (typeof renderSummaryMarkdown === 'function') return renderSummaryMarkdown(text);
+  const pre = document.createElement('pre');
+  pre.className = 'summary-panel-text';
+  pre.textContent = text;
+  return pre;
+}
+
+async function renderSummaryPanelDay(payload, isoDateStr) {
   const p = document.getElementById('summary-panel');
   const title = document.getElementById('summary-panel-title');
   const genBtn = document.getElementById('summary-generate-btn');
@@ -737,28 +754,67 @@ function renderSummaryPanelDay(payload, isoDateStr) {
     genBtn.textContent = 'この日の日次を生成';
   }
   body.replaceChildren();
+
+  // トピック別データを取得
+  let topics = {};
+  try {
+    const res = await fetchJSON(`/api/summary/topics?date=${encodeURIComponent(isoDateStr)}`);
+    topics = res.topics || {};
+  } catch (_) { /* 無視して full だけ表示 */ }
+
   const sum = payload && payload.summary;
+
+  // oneword バッジ
+  if (topics.oneword && topics.oneword.content) {
+    const badge = document.createElement('div');
+    badge.className = 'summary-day-oneword';
+    badge.textContent = topics.oneword.content.trim();
+    body.appendChild(badge);
+  }
+
+  // full サマリー（メイン）
   if (sum && sum.content) {
-    const block = typeof renderSummaryMarkdown === 'function'
-      ? renderSummaryMarkdown(sum.content)
-      : (() => {
-          const pre = document.createElement('pre');
-          pre.className = 'summary-panel-text';
-          pre.textContent = sum.content;
-          return pre;
-        })();
+    const block = _renderMd(sum.content);
     block.classList.add('summary-panel-md');
     body.appendChild(block);
   } else {
     const empty = document.createElement('p');
     empty.className = 'summary-panel-empty';
     empty.textContent =
-      'この日の日次要約はまだありません。下のボタンでこの日だけ生成できます（週次生成時も保存され、週次では再利用されます）。';
+      'この日の日次要約はまだありません。下のボタンでこの日だけ生成できます。';
     body.appendChild(empty);
+  }
+
+  // トピック別アコーディオン
+  const hasTopics = TOPIC_ORDER.some(t => topics[t] && topics[t].content);
+  if (hasTopics) {
+    const wrap = document.createElement('div');
+    wrap.className = 'summary-topics-wrap';
+
+    for (const key of TOPIC_ORDER) {
+      const t = topics[key];
+      if (!t || !t.content) continue;
+      const item = document.createElement('details');
+      item.className = 'summary-topic-item';
+
+      const summary = document.createElement('summary');
+      summary.className = 'summary-topic-label';
+      summary.textContent = TOPIC_LABEL_MAP[key] || key;
+      item.appendChild(summary);
+
+      const content = document.createElement('div');
+      content.className = 'summary-topic-body';
+      const md = _renderMd(t.content);
+      content.appendChild(md);
+      item.appendChild(content);
+
+      wrap.appendChild(item);
+    }
+    body.appendChild(wrap);
   }
 }
 
-function renderSummaryPanelWeekOrMonth(kind, payload, dateStrForApi) {
+async function renderSummaryPanelWeekOrMonth(kind, payload, dateStrForApi) {
   const p = document.getElementById('summary-panel');
   const title = document.getElementById('summary-panel-title');
   const genBtn = document.getElementById('summary-generate-btn');
@@ -775,16 +831,30 @@ function renderSummaryPanelWeekOrMonth(kind, payload, dateStrForApi) {
     genBtn.textContent = 'この期間で生成';
   }
   body.replaceChildren();
+
+  // トピック別データを取得
+  const apiPeriod = kind === 'week' ? 'week' : 'month';
+  let topics = {};
+  try {
+    const res = await fetchJSON(
+      `/api/summary/topics?period=${encodeURIComponent(apiPeriod)}&date=${encodeURIComponent(String(dateStrForApi))}`
+    );
+    topics = res.topics || {};
+  } catch (_) { /* 無視して full だけ表示 */ }
+
   const sum = payload && payload.summary;
+
+  // oneword バッジ
+  if (topics.oneword && topics.oneword.content) {
+    const badge = document.createElement('div');
+    badge.className = 'summary-day-oneword';
+    badge.textContent = topics.oneword.content.trim();
+    body.appendChild(badge);
+  }
+
+  // full サマリー（メイン）
   if (sum && sum.content) {
-    const block = typeof renderSummaryMarkdown === 'function'
-      ? renderSummaryMarkdown(sum.content)
-      : (() => {
-          const pre = document.createElement('pre');
-          pre.className = 'summary-panel-text';
-          pre.textContent = sum.content;
-          return pre;
-        })();
+    const block = _renderMd(sum.content);
     block.classList.add('summary-panel-md');
     body.appendChild(block);
   } else {
@@ -792,6 +862,44 @@ function renderSummaryPanelWeekOrMonth(kind, payload, dateStrForApi) {
     empty.className = 'summary-panel-empty';
     empty.textContent = 'この期間のサマリーはまだありません。';
     body.appendChild(empty);
+  }
+
+  // best_post（週次のみ・専用カード）
+  if (kind === 'week' && topics.best_post && topics.best_post.content) {
+    const card = document.createElement('div');
+    card.className = 'summary-best-post-card';
+    const cardTitle = document.createElement('div');
+    cardTitle.className = 'summary-best-post-title';
+    cardTitle.textContent = '🏆 今週のベスト投稿';
+    card.appendChild(cardTitle);
+    const cardBody = _renderMd(topics.best_post.content);
+    cardBody.classList.add('summary-topic-body');
+    card.appendChild(cardBody);
+    body.appendChild(card);
+  }
+
+  // トピックアコーディオン（music / health / sns / dev / behavior）
+  const weekTopicOrder = ['sns', 'music', 'health', 'dev', 'behavior'];
+  const hasTopics = weekTopicOrder.some(t => topics[t] && topics[t].content);
+  if (hasTopics) {
+    const wrap = document.createElement('div');
+    wrap.className = 'summary-topics-wrap';
+    for (const key of weekTopicOrder) {
+      const t = topics[key];
+      if (!t || !t.content) continue;
+      const item = document.createElement('details');
+      item.className = 'summary-topic-item';
+      const summary = document.createElement('summary');
+      summary.className = 'summary-topic-label';
+      summary.textContent = TOPIC_LABEL_MAP[key] || key;
+      item.appendChild(summary);
+      const content = document.createElement('div');
+      content.className = 'summary-topic-body';
+      content.appendChild(_renderMd(t.content));
+      item.appendChild(content);
+      wrap.appendChild(item);
+    }
+    body.appendChild(wrap);
   }
 }
 
@@ -979,7 +1087,7 @@ async function onSummaryGenerateClick() {
 
     const sumPayload = await fetchSummaryPayload(period, date);
     if (viewKind === 'day') {
-      renderSummaryPanelDay(sumPayload, date);
+      await renderSummaryPanelDay(sumPayload, date);
     } else {
       renderSummaryPanelWeekOrMonth(viewKind, sumPayload, date);
     }

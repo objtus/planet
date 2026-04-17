@@ -186,17 +186,20 @@ CREATE TABLE url_metadata (
 
 -- 5-11. summaries
 -- period_type: 'weekly' | 'monthly' | 'daily'（日次は週次階層生成時に保存、一覧 /summaries では週・月のみ表示）
+-- summary_type: 'full' | 'music' | 'health' | 'sns' | 'dev' | 'behavior' | 'oneword' | 'best_post'
+--   旧パイプライン（--legacy）は常に 'full'。新トピック別パイプラインは各種別を個別に保存。
 CREATE TABLE summaries (
     id           BIGSERIAL PRIMARY KEY,
     period_type  TEXT NOT NULL,
     period_start DATE NOT NULL,
     period_end   DATE NOT NULL,
     week_number  INT,
+    summary_type TEXT NOT NULL DEFAULT 'full',
     content      TEXT NOT NULL,
     model        TEXT,
     prompt_style TEXT DEFAULT 'hybrid',
     is_published BOOLEAN DEFAULT FALSE,
     published_at TIMESTAMPTZ,
     created_at   TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE (period_type, period_start)
+    CONSTRAINT summaries_unique UNIQUE (period_type, period_start, summary_type)
 );

@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}設定 — Planet{% endblock %}
+
+{% block content %}
+<div class="page">
+  <h2 class="page-heading">設定</h2>
+  <p class="settings-note">よく変える項目のみ。APIキー等の機密項目は <code>config/settings.toml</code> を直接編集してください。</p>
+
+  <div class="card settings-card" id="settings-form">
+
+    <section class="settings-section">
+      <h3 class="settings-section-title">Ollama</h3>
+      <div class="settings-field">
+        <label class="settings-label" for="s-ollama-base-url">ベース URL</label>
+        <input class="settings-input" id="s-ollama-base-url" type="text"
+               placeholder="http://localhost:11434" autocomplete="off">
+      </div>
+      <div class="settings-field">
+        <label class="settings-label" for="s-ollama-model">モデル名</label>
+        <input class="settings-input" id="s-ollama-model" type="text"
+               placeholder="gemma3:12b" autocomplete="off">
+      </div>
+    </section>
+
+    <section class="settings-section">
+      <h3 class="settings-section-title">サマリー生成 — ログ取得上限</h3>
+      <p class="settings-hint">0 を設定するとデフォルト値が使われます。</p>
+      <div class="settings-field">
+        <label class="settings-label" for="s-max-daily">日次 (MAX_LOG_LINES_DAILY)</label>
+        <input class="settings-input settings-input-num" id="s-max-daily" type="number" min="0" step="100"
+               placeholder="3500">
+      </div>
+      <div class="settings-field">
+        <label class="settings-label" for="s-max-weekly">週次 (MAX_LOG_LINES_WEEKLY)</label>
+        <input class="settings-input settings-input-num" id="s-max-weekly" type="number" min="0" step="100"
+               placeholder="5600">
+      </div>
+      <div class="settings-field">
+        <label class="settings-label" for="s-max-monthly">月次 (MAX_LOG_LINES_MONTHLY)</label>
+        <input class="settings-input settings-input-num" id="s-max-monthly" type="number" min="0" step="100"
+               placeholder="8000">
+      </div>
+    </section>
+
+    <section class="settings-section">
+      <h3 class="settings-section-title">サマリー生成 — Ollama タイムアウト</h3>
+      <div class="settings-field">
+        <label class="settings-label" for="s-ollama-timeout">タイムアウト（秒）</label>
+        <input class="settings-input settings-input-num" id="s-ollama-timeout" type="number" min="60" step="60"
+               placeholder="1800">
+      </div>
+    </section>
+
+    <div class="settings-actions">
+      <button class="settings-save-btn" onclick="saveSettings()">保存</button>
+      <span class="settings-status" id="settings-status"></span>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadSettings() {
+  try {
+    const res = await fetch('/api/settings');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const d = await res.json();
+    document.getElementById('s-ollama-base-url').value = d.ollama_base_url || '';
+    document.getElementById('s-ollama-model').value     = d.ollama_model || '';
+    document.getElementById('s-max-daily').value        = d.max_log_lines_daily || '';
+    document.getElementById('s-max-weekly').value       = d.max_log_lines_weekly || '';
+    document.getElementById('s-max-monthly').value      = d.max_log_lines_monthly || '';
+    document.getElementById('s-ollama-timeout').value   = d.ollama_timeout_sec || '';
+  } catch (e) {
+    setStatus('読み込みに失敗しました: ' + e.message, 'error');
+  }
+}
+
+async function saveSettings() {
+  const payload = {
+    ollama_base_url:       document.getElementById('s-ollama-base-url').value.trim(),
+    ollama_model:          document.getElementById('s-ollama-model').value.trim(),
+    max_log_lines_daily:   parseInt(document.getElementById('s-max-daily').value)   || 0,
+    max_log_lines_weekly:  parseInt(document.getElementById('s-max-weekly').value)  || 0,
+    max_log_lines_monthly: parseInt(document.getElementById('s-max-monthly').value) || 0,
+    ollama_timeout_sec:    parseInt(document.getElementById('s-ollama-timeout').value) || 0,
+  };
+  setStatus('保存中…');
+  try {
+    const res = await fetch('/api/settings', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      throw new Error(d.error || 'HTTP ' + res.status);
+    }
+    setStatus('保存しました', 'ok');
+  } catch (e) {
+    setStatus('保存に失敗しました: ' + e.message, 'error');
+  }
+}
+
+function setStatus(msg, type) {
+  const el = document.getElementById('settings-status');
+  el.textContent = msg;
+  el.className = 'settings-status' + (type ? ' settings-status-' + type : '');
+}
+
+loadSettings();
+</script>
+{% endblock %}

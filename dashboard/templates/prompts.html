@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block title %}プロンプト編集 — Planet{% endblock %}
+
+{% block content %}
+<div class="page-wide">
+  <div class="prompts-layout">
+
+    <!-- ファイル一覧（左ペイン） -->
+    <div class="prompts-sidebar">
+      <div class="prompts-sidebar-title">プロンプトファイル</div>
+      <ul class="prompts-list" id="prompts-list">
+        <!-- JS で動的生成 -->
+      </ul>
+    </div>
+
+    <!-- エディタ（右ペイン） -->
+    <div class="prompts-editor-area">
+      <div class="prompts-editor-header">
+        <span class="prompts-current-file" id="current-filename">ファイルを選択してください</span>
+        <div class="prompts-editor-actions">
+          <span class="prompts-unsaved-badge" id="unsaved-badge" style="display:none">未保存</span>
+          <button class="prompts-save-btn" id="save-btn" onclick="savePrompt()" disabled>保存</button>
+        </div>
+      </div>
+      <textarea
+        class="prompts-textarea"
+        id="prompt-textarea"
+        spellcheck="false"
+        placeholder="左のリストからファイルを選択してください"
+        disabled
+        oninput="onTextareaInput()"
+      ></textarea>
+      <div class="prompts-status" id="prompts-status"></div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentFile = null;
+let originalContent = '';
+let isDirty = false;
+
+async function loadFileList() {
+  try {
+    const res = await fetch('/api/prompts');
+    const data = await res.json();
+    const list = document.getElementById('prompts-list');
+    list.innerHTML = '';
+    (data.files || []).forEach(name => {
+      const li = document.createElement('li');
+      li.className = 'prompts-list-item';
+      li.textContent = name;
+      li.dataset.name = name;
+      li.onclick = () => selectFile(name);
+      list.appendChild(li);
+    });
+  } catch (e) {
+    setStatus('ファイル一覧の取得に失敗しました: ' + e.message, 'error');
+  }
+}
+
+async function selectFile(name) {
+  if (isDirty) {
+    if (!confirm('未保存の変更があります。破棄して別のファイルを開きますか？')) return;
+  }
+  currentFile = name;
+  isDirty = false;
+
+  document.querySelectorAll('.prompts-list-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.name === name);
+  });
+  document.getElementById('current-filename').textContent = name;
+  document.getElementById('unsaved-badge').style.display = 'none';
+
+  const ta = document.getElementById('prompt-textarea');
+  ta.disabled = true;
+  ta.value = '読み込み中…';
+  setStatus('');
+
+  try {
+    const res = await fetch('/api/prompts/' + encodeURIComponent(name));
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    originalContent = data.content || '';
+    ta.value = originalContent;
+    ta.disabled = false;
+    ta.focus();
+    document.getElementById('save-btn').disabled = false;
+  } catch (e) {
+    ta.value = '';
+    setStatus('ファイルの読み込みに失敗しました: ' + e.message, 'error');
+  }
+}
+
+function onTextareaInput() {
+  const current = document.getElementById('prompt-textarea').value;
+  isDirty = (current !== originalContent);
+  document.getElementById('unsaved-badge').style.display = isDirty ? '' : 'none';
+}
+
+async function savePrompt() {
+  if (!currentFile) return;
+  const content = document.getElementById('prompt-textarea').value;
+  setStatus('保存中…');
+  try {
+    const res = await fetch('/api/prompts/' + encodeURIComponent(currentFile), {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({content})
+    });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      throw new Error(d.error || 'HTTP ' + res.status);
+    }
+    originalContent = content;
+    isDirty = false;
+    document.getElementById('unsaved-badge').style.display = 'none';
+    setStatus('保存しました', 'ok');
+  } catch (e) {
+    setStatus('保存に失敗しました: ' + e.message, 'error');
+  }
+}
+
+function setStatus(msg, type) {
+  const el = document.getElementById('prompts-status');
+  el.textContent = msg;
+  el.className = 'prompts-status' + (type ? ' prompts-status-' + type : '');
+}
+
+// Ctrl+S / Cmd+S で保存
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+    e.preventDefault();
+    if (!document.getElementById('save-btn').disabled) savePrompt();
+  }
+});
+
+// 未保存変更あり → ページ離脱警告
+window.addEventListener('beforeunload', e => {
+  if (isDirty) {
+    e.preventDefault();
+    e.returnValue = '';
+  }
+});
+
+loadFileList();
+</script>
+{% endblock %}

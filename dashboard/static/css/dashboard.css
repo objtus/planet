@@ -1515,3 +1515,326 @@ details[open] summary::before { content: "▼ "; }
   .page, .page-wide { padding: 1rem 0.75rem; }
   .cal-grid th, .cal-grid td { font-size: 11px; }
 }
+
+/* =========================================================
+   PROMPTS EDITOR
+   ========================================================= */
+
+.prompts-layout {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 0;
+  height: calc(100vh - 56px);
+  overflow: hidden;
+}
+
+.prompts-sidebar {
+  border-right: 1px solid var(--color-border);
+  overflow-y: auto;
+  background: var(--color-surface);
+}
+
+.prompts-sidebar-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-tertiary);
+  padding: 12px 14px 8px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.prompts-list {
+  list-style: none;
+  margin: 0;
+  padding: 6px 0;
+}
+
+.prompts-list-item {
+  padding: 7px 14px;
+  font-size: 12px;
+  font-family: monospace;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  border-left: 3px solid transparent;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.prompts-list-item:hover { background: var(--color-hover); }
+.prompts-list-item.active {
+  color: var(--color-accent);
+  border-left-color: var(--color-accent);
+  background: var(--color-hover);
+  font-weight: 600;
+}
+
+.prompts-editor-area {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.prompts-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+  flex-shrink: 0;
+}
+
+.prompts-current-file {
+  font-size: 13px;
+  font-family: monospace;
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+
+.prompts-editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.prompts-unsaved-badge {
+  font-size: 11px;
+  background: var(--color-warn, #f59e0b);
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.prompts-save-btn {
+  font-size: 12px;
+  padding: 5px 16px;
+  background: var(--color-accent);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.prompts-save-btn:disabled {
+  background: var(--color-text-tertiary);
+  cursor: default;
+}
+.prompts-save-btn:not(:disabled):hover { opacity: 0.85; }
+
+.prompts-textarea {
+  flex: 1;
+  width: 100%;
+  resize: none;
+  border: none;
+  outline: none;
+  padding: 14px 18px;
+  font-size: 13px;
+  font-family: 'SFMono-Regular', 'Consolas', 'Menlo', monospace;
+  line-height: 1.6;
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  tab-size: 4;
+}
+
+.prompts-status {
+  font-size: 12px;
+  padding: 4px 16px;
+  min-height: 22px;
+  flex-shrink: 0;
+  color: var(--color-text-tertiary);
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+}
+.prompts-status-ok { color: var(--color-green, #10b981); }
+.prompts-status-error { color: var(--color-danger, #ef4444); }
+
+@media (max-width: 600px) {
+  .prompts-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: 200px 1fr;
+    height: auto;
+  }
+  .prompts-sidebar { border-right: none; border-bottom: 1px solid var(--color-border); }
+  .prompts-textarea { height: 60vh; }
+}
+
+/* =========================================================
+   SETTINGS PAGE
+   ========================================================= */
+
+.settings-note {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin-bottom: 16px;
+}
+
+.settings-card {
+  max-width: 560px;
+}
+
+.settings-section {
+  margin-bottom: 28px;
+}
+
+.settings-section-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin: 0 0 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.settings-hint {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  margin: -6px 0 10px;
+}
+
+.settings-field {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.settings-label {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  width: 200px;
+  flex-shrink: 0;
+}
+
+.settings-input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-family: monospace;
+}
+.settings-input:focus { outline: none; border-color: var(--color-accent); }
+
+.settings-input-num { width: 100px; flex: none; }
+
+.settings-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-top: 8px;
+}
+
+.settings-save-btn {
+  padding: 7px 22px;
+  background: var(--color-accent);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.settings-save-btn:hover { opacity: 0.85; }
+
+.settings-status { font-size: 12px; color: var(--color-text-tertiary); }
+.settings-status-ok { color: var(--color-green, #10b981); }
+.settings-status-error { color: var(--color-danger, #ef4444); }
+
+/* =========================================================
+   DAY SUMMARY: oneword badge + topic accordion
+   ========================================================= */
+
+.summary-day-oneword {
+  font-size: 13px;
+  font-style: italic;
+  color: var(--color-text-secondary);
+  border-left: 3px solid var(--color-accent);
+  padding: 4px 10px;
+  margin-bottom: 10px;
+  line-height: 1.5;
+}
+
+.summary-topics-wrap {
+  margin-top: 12px;
+  border-top: 0.5px solid var(--color-border-tertiary);
+  padding-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.summary-topic-item {
+  border: 0.5px solid var(--color-border-tertiary);
+  border-radius: var(--border-radius-sm, 4px);
+  background: var(--color-background-primary);
+  overflow: hidden;
+}
+
+.summary-topic-label {
+  list-style: none;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.summary-topic-label::before {
+  content: '›';
+  font-size: 14px;
+  transition: transform 0.15s;
+  display: inline-block;
+}
+.summary-topic-item[open] > .summary-topic-label::before {
+  transform: rotate(90deg);
+}
+.summary-topic-label::-webkit-details-marker { display: none; }
+.summary-topic-label:hover { color: var(--color-text-primary); }
+
+.summary-topic-body {
+  padding: 6px 12px 10px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--color-text-primary);
+  border-top: 0.5px solid var(--color-border-tertiary);
+}
+
+/* 週次ベストポスト専用カード */
+.summary-best-post-card {
+  margin-top: 12px;
+  border: 1px solid var(--color-accent, #f5c542);
+  border-radius: var(--border-radius-sm, 4px);
+  background: var(--color-background-secondary, #fdf9ec);
+  overflow: hidden;
+}
+.summary-best-post-title {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  border-bottom: 1px solid var(--color-accent, #f5c542);
+  background: color-mix(in srgb, var(--color-accent, #f5c542) 12%, transparent);
+}
+.summary-best-post-card .summary-topic-body {
+  padding: 10px 14px;
+  font-size: 13px;
+  line-height: 1.65;
+}
+/* ベストポスト内の引用ブロック（--- で囲まれた区域） */
+.summary-best-post-card .summary-topic-body hr {
+  border: none;
+  border-top: 0.5px solid var(--color-border-tertiary);
+  margin: 8px 0;
+}
+.summary-best-post-card .summary-topic-body strong {
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
