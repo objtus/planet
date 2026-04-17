@@ -41,6 +41,7 @@ from summarizer.context import (
     fetch_activity_digest,
     fetch_activity_digest_for_day,
     fetch_activity_digest_week_balanced,
+    fetch_lastfm_digest_for_day,
     fetch_scrapbox_diary,
     fetch_topic_digest_for_day,
     fetch_topic_digest_for_week,
@@ -581,15 +582,32 @@ def _run_day_topics(
     day_label = f"{day.strftime('%Y-%m-%d')}（JST）"
     day_iso = day.isoformat()
 
-    # ① 各トピックの生ログを取得（SNS ソースを含むトピックはアカウント名を含める）
-    SNS_TYPES = {"sns", "music", "media"}  # source_name_map を使うトピック
+    # ① 各トピックの生ログを取得
+    # music は lastfm_plays テーブルの構造化データ（artist/track/album）+ SNS 音楽関連投稿
+    # その他 SNS ソースを含むトピックはアカウント名マップを使う
+    SNS_TYPES = {"sns", "music", "media"}
     source_name_map = get_source_name_map(conn)
     topic_digests: dict[str, str] = {}
     for topic, src_types in TOPIC_SOURCE_TYPES.items():
-        use_name_map = source_name_map if topic in SNS_TYPES else None
-        topic_digests[topic] = fetch_topic_digest_for_day(
-            conn, day, src_types, source_name_map=use_name_map
-        )
+        if topic == "music":
+            # Last.fm は lastfm_plays から構造化取得（YouTube スクロブルの乱れを防ぐ）
+            lastfm_part = fetch_lastfm_digest_for_day(conn, day)
+            # SNS の音楽関連投稿（misskey/mastodon のみ）
+            sns_only_types = [t for t in src_types if t in ("misskey", "mastodon")]
+            sns_part = fetch_topic_digest_for_day(
+                conn, day, sns_only_types, source_name_map=source_name_map
+            ) if sns_only_types else ""
+            parts = []
+            if lastfm_part:
+                parts.append(f"--- Last.fm 再生ログ ---\n{lastfm_part}")
+            if sns_part:
+                parts.append(f"--- SNS 投稿ログ ---\n{sns_part}")
+            topic_digests[topic] = "\n\n".join(parts)
+        else:
+            use_name_map = source_name_map if topic in SNS_TYPES else None
+            topic_digests[topic] = fetch_topic_digest_for_day(
+                conn, day, src_types, source_name_map=use_name_map
+            )
 
     has_any = any(d.strip() for d in topic_digests.values())
     # health/sns が無くても Scrapbox 日記があれば続行（full の生成に使うため）

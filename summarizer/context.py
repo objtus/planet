@@ -151,6 +151,38 @@ TOPIC_SOURCE_TYPES: dict[str, list[str]] = {
 MAX_LOG_LINES_TOPIC = 800
 
 
+def fetch_lastfm_digest_for_day(conn, day: date, *, max_lines: int = 800) -> str:
+    """Last.fm 再生ログを lastfm_plays テーブルから直接取得し、構造化テキストで返す。
+
+    logs.content は YouTube チャンネル名がアーティスト名になることがあるため、
+    lastfm_plays の artist / track / album 列を使い明示的な形式で渡す。
+    """
+    day_start_local = datetime.combine(day, time.min, tzinfo=JST)
+    day_end_local = day_start_local + timedelta(days=1)
+    ds_utc = day_start_local.astimezone(timezone.utc)
+    de_utc = day_end_local.astimezone(timezone.utc)
+    sql = """
+        SELECT lp.artist, lp.track, lp.album, lp.played_at
+          FROM lastfm_plays lp
+         WHERE lp.played_at >= %s
+           AND lp.played_at <  %s
+         ORDER BY lp.played_at ASC
+         LIMIT %s
+    """
+    with conn.cursor() as cur:
+        cur.execute(sql, (ds_utc, de_utc, max_lines))
+        rows = cur.fetchall()
+    if not rows:
+        return ""
+    lines = []
+    for artist, track, album, played_at in rows:
+        ts_jst = played_at.astimezone(JST) if played_at.tzinfo else \
+            played_at.replace(tzinfo=timezone.utc).astimezone(JST)
+        album_part = f"（{album}）" if album else ""
+        lines.append(f"[{ts_jst:%H:%M}] {artist} - {track}{album_part}")
+    return "\n".join(lines)
+
+
 def get_source_name_map(conn) -> dict[int, str]:
     """data_sources.id → 表示名（例: "tanoshii.site @health"）のマッピングを返す。
     ログ行のサーバー/アカウント情報を LLM に渡すために使う。
