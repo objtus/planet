@@ -1238,6 +1238,13 @@ details[open] summary::before { content: "▼ "; }
 }
 
 /* 収集ボタン（行内） */
+.collect-cell-btns {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+}
 .collect-btn {
   font-size: 11px;
   padding: 3px 8px;

@@ -79,8 +79,15 @@
           <!-- 収集ボタン -->
           <td style="text-align:center;padding:4px">
             {% if item.type in ['misskey','mastodon','lastfm','weather','github','rss','youtube','scrapbox'] %}
+            <div class="collect-cell-btns">
             <button class="collect-btn" data-type="{{ item.type }}"
                     onclick="collectSource('{{ item.type }}', this)" title="{{ item.type }} を今すぐ収集">▶</button>
+            {% if item.type == 'scrapbox' %}
+            <button class="collect-btn obsidian-scrapbox-btn" type="button"
+                    onclick="syncObsidianScrapbox(this)"
+                    title="Scrapbox を広域収集してから Obsidian vault に同期">📝</button>
+            {% endif %}
+            </div>
             {% else %}
             <span style="font-size:11px;color:var(--color-text-tertiary)" title="iPhone から自動送信">—</span>
             {% endif %}
@@ -201,6 +208,34 @@ function showLog(title, body) {
   document.getElementById('collect-log-body').textContent  = body || '（出力なし）';
   logEl.style.display = 'block';
   logEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+async function syncObsidianScrapbox(btn) {
+  const original = btn.textContent;
+  btn.textContent = '…';
+  btn.disabled = true;
+  showLog('Obsidian 連携（Scrapbox 広域収集 → vault）…', '');
+  try {
+    const res = await fetch('/api/obsidian/scrapbox-sync', { method: 'POST' });
+    let data = {};
+    try { data = await res.json(); } catch (_) {}
+    if (!res.ok || data.error) {
+      const body = [
+        data.collect_output && String(data.collect_output),
+        data.sync_output && String(data.sync_output),
+        data.error && String(data.error),
+      ].filter(Boolean).join('\n');
+      showLog('Obsidian 連携 — エラー', body || JSON.stringify(data));
+      btn.textContent = '✕';
+    } else {
+      showLog('Obsidian 連携 — 完了', data.output || '');
+      btn.textContent = '✓';
+    }
+  } catch (e) {
+    showLog('Obsidian 連携 — 通信エラー', String(e));
+    btn.textContent = '✕';
+  }
+  setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 3000);
 }
 
 // ---- Netflix / Prime CSV 取り込み ---------------------------------------

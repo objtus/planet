@@ -1296,6 +1296,76 @@ def create_app():
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
+    SCRAPBOX_SYNC_COLLECT_TIMEOUT = 600
+
+    @app.route("/api/obsidian/scrapbox-sync", methods=["POST"])
+    def api_obsidian_scrapbox_sync():
+        """Scrapbox を manual_lookback_days で広域収集し、同じ暦日窓で Obsidian vault を同期。"""
+        cfg = load_config()
+        obs_raw = cfg.get("obsidian")
+        if not isinstance(obs_raw, dict) or not str(obs_raw.get("vault_path") or "").strip():
+            return jsonify({"error": "[obsidian] vault_path が未設定です"}), 400
+
+        scrap = cfg.get("scrapbox") or {}
+        try:
+            manual_lb = int(scrap.get("manual_lookback_days", 120))
+        except (TypeError, ValueError):
+            manual_lb = 120
+        manual_lb = max(1, manual_lb)
+
+        skip_collect = request.args.get("skip_collect") in ("1", "true", "yes")
+        collect_out = ""
+
+        if not skip_collect:
+            script = ROOT / "collectors" / "scrapbox.py"
+            env = {
+                **os.environ,
+                "PYTHONPATH": str(ROOT),
+                "SCRAPBOX_LOOKBACK_DAYS": str(manual_lb),
+            }
+            try:
+                result = subprocess.run(
+                    [str(PYTHON), str(script)],
+                    capture_output=True,
+                    text=True,
+                    timeout=SCRAPBOX_SYNC_COLLECT_TIMEOUT,
+                    cwd=str(ROOT),
+                    env=env,
+                )
+            except subprocess.TimeoutExpired:
+                return jsonify(
+                    {"error": f"Scrapbox 収集がタイムアウト（{SCRAPBOX_SYNC_COLLECT_TIMEOUT}秒）"}
+                ), 504
+            collect_out = (result.stdout or "").strip()
+            if result.returncode != 0:
+                err = (result.stderr or result.stdout or "エラー").strip()
+                return jsonify(
+                    {
+                        "error": err[-800:],
+                        "collect_output": collect_out[-600:] if collect_out else "",
+                    }
+                ), 500
+
+        from publisher.obsidian_scrapbox import sync_recent_to_obsidian
+
+        ok, msgs = sync_recent_to_obsidian(manual_lb)
+        sync_text = "\n".join(msgs)
+
+        if not ok:
+            return jsonify(
+                {
+                    "error": "Obsidian 同期でエラー",
+                    "collect_output": collect_out[-600:] if collect_out else "",
+                    "sync_output": sync_text[-2000:],
+                }
+            ), 500
+
+        parts = []
+        if collect_out:
+            parts.append(f"--- Scrapbox 収集 ---\n{collect_out[-600:]}")
+        parts.append(f"--- Obsidian ---\n{sync_text[-2000:]}")
+        return jsonify({"ok": True, "output": "\n\n".join(parts)})
+
     # ------------------------------------------------------------------ #
     # API: Netflix / Prime 視聴 CSV 取り込み（ソース管理から DnD）
     # ------------------------------------------------------------------ #

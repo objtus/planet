@@ -22,6 +22,8 @@ PUBLISHER_LOG=/home/objtus/planet/cron/publisher.log
 10 6 * * * cd $PLANET && $PYTHON -m collectors.rss >> $LOG 2>&1
 15 6 * * * cd $PLANET && $PYTHON -m collectors.youtube >> $LOG 2>&1
 20 6 * * * cd $PLANET && $PYTHON -m collectors.scrapbox >> $LOG 2>&1
+# 直近 [scrapbox].lookback_days 暦日ぶん vault へ Scrapbox を反映（settings の vault_path 必須）
+# 25 6 * * * cd $PLANET && $PYTHON -m publisher.obsidian_scrapbox --recent >> $LOG 2>&1
 
 # Planet feed（planet-data.json / planet-meta.json → ~/planet-feed へ push）
 # 1 日 3 回（7 / 15 / 23 時・ローカル＝ファイル先頭の Asia/Tokyo 想定）。

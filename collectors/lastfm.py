@@ -46,11 +46,16 @@ class LastfmCollector(BaseCollector):
             data = resp.json()
 
             tracks = data.get("recenttracks", {}).get("track", [])
+            # 1件のときは辞書のみ返る。辞書をそのままforするとキー文字列になるのでリスト化する
+            if isinstance(tracks, dict):
+                tracks = [tracks]
             if not tracks:
                 break
 
             inserted = 0
             for track in tracks:
+                if not isinstance(track, dict):
+                    continue
                 # 再生中スキップ
                 if track.get("@attr", {}).get("nowplaying"):
                     continue

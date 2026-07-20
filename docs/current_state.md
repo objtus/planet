@@ -47,7 +47,7 @@ Misskey（msk.ilnk.info / pon.icu archived / tanoshii.site / misskey.io @vknsq �
 - **プロンプト管理 (`/prompts`)**: プロンプトファイル一覧・編集・保存（`GET/POST /api/prompts/<name>`）
 - **設定 (`/settings`)**: Ollama host/model・サマライザー設定の閲覧と変更（`GET/POST /api/settings`）
 - **統計**: Chart.js（ローカル）・月別/年別切替
-- **ソース管理**: 表示順・略称・今すぐ収集（`POST /api/collect/<stype>`、misskey〜youtube に加え **scrapbox**）
+- **ソース管理**: 表示順・略称・今すぐ収集（`POST /api/collect/<stype>`、misskey〜youtube に加え **scrapbox**）。scrapbox 行は **Obsidian 連携**（`POST /api/obsidian/scrapbox-sync`、詳細は `docs/obsidian_scrapbox.md`）
 - **`/summaries`**: 公開トグル（`PATCH /api/summaries/<id>/publish`）、週行から7日リンク
 - **DB拡張**: `data_sources` に `sort_order` / `short_name` 追加（`db/migrate_sort_shortname.sql`）
 

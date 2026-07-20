@@ -4,6 +4,7 @@ stallプロジェクトの日付ページから自分のセクションを抽出
 複数人が同じページに書くため、アイコン記法（[health.icon]）でセクション分割。
 """
 
+import os
 import re
 import json
 import urllib.parse
@@ -80,6 +81,114 @@ def extract_my_entries(text: str, my_icons: list) -> str:
     return "\n".join(result)
 
 
+def scrapbox_cosense_page_url(project: str, page_title: str) -> str:
+    """Cosense のページ URL（page_title は API と同じ、例 2026/05/10）。"""
+    enc = urllib.parse.quote(page_title, safe="")
+    return f"https://scrapbox.io/{project}/{enc}"
+
+
+def convert_scrapbox_line_to_markdown(text: str, project: str) -> str:
+    """1 行内の代表的な Scrapbox ブラケット記法を Markdown リンクに寄せる。
+
+    - [[ページタイトル]] → 同一プロジェクトの Cosense URL
+    - [ページタイトル]（単一括弧）→ プロジェクト内ページと同様に Cosense URL
+    - [ラベル https://...] → [ラベル](https://...)
+    - [https://...] 単体 → <https://...>
+    - [/相対/パス] → プロジェクト直下ページとして URL 化（先頭 / を除いたタイトル）
+    - [* 太字] → **太字**
+
+    単一括弧は、既に Markdown リンクの `[text](url)` となった部分（] の直後が '('）
+    にはマッチしない。
+    """
+    # 1) [[内部リンク]]
+    def _wikilink(m):
+        title = (m.group(1) or "").strip()
+        if not title:
+            return m.group(0)
+        url = scrapbox_cosense_page_url(project, title)
+        return f"[{title}]({url})"
+
+    text = re.sub(r"\[\[([^\]]+)\]\]", _wikilink, text)
+
+    # 2) 太字
+    text = re.sub(r"\[\*+\s+(.*?)\]", r"**\1**", text)
+
+    # 3) [ラベル https://...]（URL は ] まで）
+    text = re.sub(
+        r"\[([^\]]+?)\s+(https?://[^]]+)\]",
+        lambda m: f"[{(m.group(1) or '').strip()}]({(m.group(2) or '').strip()})",
+        text,
+    )
+
+    # 4) [https://...] のみ
+    text = re.sub(r"\[(https?://[^]]+)\]", r"<\1>", text)
+
+    # 5) [/で始まる相対ページ]
+    def _slash(m):
+        t = (m.group(1) or "").strip().lstrip("/")
+        if not t:
+            return m.group(0)
+        url = scrapbox_cosense_page_url(project, t)
+        return f"[{t}]({url})"
+
+    text = re.sub(r"\[\s*/([^]]+)\]", _slash, text)
+
+    # 6) [ページタイトル]（単一括弧・プロジェクト内リンク）… 既存の [text](url) とは衝突しない
+    def _single_page(m):
+        inner = (m.group(1) or "").strip()
+        if not inner:
+            return m.group(0)
+        if inner.startswith("http://") or inner.startswith("https://"):
+            return m.group(0)
+        if ICON_PATTERN.match(inner):
+            return m.group(0)
+        url = scrapbox_cosense_page_url(project, inner)
+        return f"[{inner}]({url})"
+
+    text = re.sub(r"\[([^\]]+)\](?!\()", _single_page, text)
+
+    return text
+
+
+def extract_my_entries_obsidian(text: str, my_icons: list, project: str) -> str:
+    """自分のセクションを抽出し、Scrapbox 記法を Markdown リンク付きに変換。"""
+    lines = text.split("\n")
+    in_my_section = False
+    raw_lines = []
+
+    for line in lines:
+        stripped = line.strip()
+
+        if any(f"[{icon}]" == stripped for icon in my_icons):
+            in_my_section = True
+            continue
+
+        if ICON_PATTERN.match(stripped) and in_my_section:
+            in_my_section = False
+            continue
+
+        if in_my_section:
+            if NAV_PATTERN.match(stripped):
+                continue
+            if not stripped:
+                continue
+            md = convert_scrapbox_line_to_markdown(stripped, project)
+            if md:
+                raw_lines.append((_measure_indent(line), md))
+
+    if not raw_lines:
+        return ""
+
+    base = min(c for c, _ in raw_lines)
+    result = []
+    for indent, md_line in raw_lines:
+        level = max(0, indent - base)
+        prefix = "　" * level + ("・" if level > 0 else "")
+        result.append(f"{prefix}{md_line}")
+
+    return "\n".join(result)
+
+
 class ScrapboxCollector(BaseCollector):
 
     def collect(self):
@@ -87,7 +196,13 @@ class ScrapboxCollector(BaseCollector):
         source_id  = cfg["source_id"]
         project    = cfg["project"]
         my_icons   = cfg["my_icons"]
-        lookback   = cfg.get("lookback_days", 30)
+        lookback   = int(cfg.get("lookback_days", 30))
+        env_lb = os.environ.get("SCRAPBOX_LOOKBACK_DAYS")
+        if env_lb is not None and str(env_lb).strip() != "":
+            try:
+                lookback = max(1, int(str(env_lb).strip()))
+            except ValueError:
+                print(f"[Scrapbox] SCRAPBOX_LOOKBACK_DAYS={env_lb!r} は無効 — settings の lookback を使用", flush=True)
 
         print(f"[Scrapbox] project={project} lookback={lookback}日 (source_id={source_id})")
 

@@ -42,6 +42,8 @@ url = "https://yuinoid.neocities.org/rss.xml"
 project       = "stall"
 my_icons      = ["health.icon"]
 lookback_days = 30
+# ソース管理の「Obsidian 連携」: この日数だけ広く Scrapbox を取り込んでから vault 同期
+manual_lookback_days = 120
 
 [neocities]
 api_key = "YOUR_NEOCITIES_API_KEY"
@@ -49,6 +51,16 @@ api_key = "YOUR_NEOCITIES_API_KEY"
 # planet-feed（Cloudflare Pages 用 JSON を git push）
 # repo_path 未指定時は ~/planet-feed
 # push = false のときは commit のみ（または --push で上書き）
+
+# Scrapbox 日記 → Obsidian デイリーノート（publisher/obsidian_scrapbox.py）
+[obsidian]
+# vault_path = "/home/you/vault"
+# daily_dir = "20-daily"
+# Templater テンプレのパス（vault からの相対）。DataviewJS 以降をここから取り込む
+# daily_template = "99-templates/dailynote-template.md"
+# weather_city = "Nagoya"
+# weather_max_days_back = 7
+
 [planet_feed]
 # repo_path は必ずこのマシン上の実パス（例の /home/you/... のままにしない）
 # repo_path = "/home/objtus/planet-feed"
