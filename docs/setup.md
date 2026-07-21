@@ -62,6 +62,7 @@ cd planet
 python3 -m venv venv
 source venv/bin/activate
 pip install flask psycopg2-binary requests feedparser beautifulsoup4 pylast tomllib
+# Hermes Agent 連携（任意）: pip install -r requirements-mcp.txt — 詳細 docs/planet_mcp_setup.md
 ```
 
 ## Step 6: 設定ファイルの作成

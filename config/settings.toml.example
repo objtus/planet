@@ -5,6 +5,14 @@ name     = "planet"
 user     = "planet"
 password = "password"
 
+# Planet MCP 専用（省略時は [database] を使用）。migrate_planet_mcp_user.sql 実行後に有効化。
+# [database_mcp]
+# host     = "localhost"
+# port     = 5432
+# name     = "planet"
+# user     = "planet_mcp"
+# password = "CHANGE_ME_planet_mcp"
+
 [misskey.misskey_io]
 base_url = "https://misskey.io"
 token    = "YOUR_MISSKEY_IO_TOKEN"

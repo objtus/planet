@@ -32,6 +32,9 @@ planet/
 │       # oneword.txt / best_post.txt  ← new topic pipeline
 │       # weekly_hybrid.txt / monthly_hybrid.txt / daily_hybrid.txt  ← legacy (--legacy)
 ├── publisher/           # planet-feed JSON (`python -m publisher.build_feed`) — Neocities summary HTML (M4) TBD
+├── planet_mcp/          # Hermes Agent 向け MCP サーバー (`python -m planet_mcp.server`)
+│   ├── server.py        # FastMCP エントリ
+│   └── queries.py       # DB クエリ（dashboard / summarizer 同等）
 ├── dashboard/           # Flask web UI
 │   ├── app.py           # Core Flask application (~1,167 lines)
 │   ├── static/          # CSS, JS, bundled libraries (Chart.js, marked, DOMPurify)
@@ -169,6 +172,10 @@ python -m summarizer.generate --period day --date 2025-12-31 --regenerate-daily 
 # Planet feed JSON → ~/planet-feed (see docs/planet_feed_setup.md)
 python -m publisher.build_feed --dry-run
 python -m publisher.build_feed --no-push
+
+# Planet MCP（Hermes Agent 連携 — see docs/planet_mcp_setup.md）
+pip install -r requirements-mcp.txt
+PYTHONPATH=. ./venv/bin/python -m planet_mcp.server   # stdio（Hermes / mcp-proxy から起動）
 ```
 
 ### Service management (production)
@@ -296,6 +303,7 @@ Always check `docs/` before making architectural decisions:
 | `docs/setup.md` | Installation walkthrough |
 | `docs/decisions.md` | Design rationale (why PostgreSQL, Ollama, etc.) |
 | `docs/phase6_plan.md` | Remaining milestones (M3–M6) |
+| `docs/planet_mcp_setup.md` | Hermes Agent MCP 連携（投稿検索・タイムライン・サマリー） |
 | `docs/api/` | Per-service API references |
 
 ---
